@@ -1,0 +1,17 @@
+<Application x:Class="TeklaLookup.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://lookupengine.com/xaml"
+             xmlns:svc="clr-namespace:TeklaLookup.App.Services"
+             StartupUri="Views/MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Light" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+            <svc:PropertyEntryToIconConverter x:Key="PropertyIcon" />
+            <svc:SnapshotTypeToIconConverter x:Key="SnapshotIcon" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

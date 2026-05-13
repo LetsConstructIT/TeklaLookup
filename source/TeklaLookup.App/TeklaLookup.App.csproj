@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <UseWPF>true</UseWPF>
+        <RootNamespace>TeklaLookup.App</RootNamespace>
+        <AssemblyName>TeklaLookup</AssemblyName>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+
+    <!-- Tekla Open API (2026) -->
+    <ItemGroup>
+        <PackageReference Include="Tekla.Structures"           Version="2026.*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Model"     Version="2026.*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Drawing"   Version="2026.*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Dialog"    Version="2026.*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Catalogs"  Version="2026.*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Datatype"  Version="2026.*" ExcludeAssets="runtime" />
+    </ItemGroup>
+
+    <!-- Build tooling: patches the generated .exe.config so Tekla loads the app correctly -->
+    <ItemGroup>
+        <PackageReference Include="TSAppConfigPatcherTask" Version="*" />
+    </ItemGroup>
+
+    <!-- DataContractJsonSerializer (used by SettingsStore) lives in System.Runtime.Serialization -->
+    <!-- System.Windows.Forms is used only for Screen.AllScreens (multi-monitor visibility check) -->
+    <ItemGroup>
+        <Reference Include="System.Runtime.Serialization" />
+        <Reference Include="System.Windows.Forms" />
+    </ItemGroup>
+
+    <!-- UI framework — themed Fluent controls (re-namespaced WPF-UI fork) -->
+    <ItemGroup>
+        <ProjectReference Include="..\LookupEngine.UI\source\LookupEngine.UI\LookupEngine.UI.csproj" />
+    </ItemGroup>
+
+    <!--
+        Copy supporting DLLs that Tekla's app.config redirects to specific versions but doesn't
+        provide a <codeBase> for. Without these next to the .exe, the CLR honors the binding
+        redirect but can't locate the file → FileNotFoundException at startup.
+    -->
+    <PropertyGroup>
+        <TeklaBinDir>C:\TeklaStructures\$(TeklaVersion)\bin</TeklaBinDir>
+    </PropertyGroup>
+    <Target Name="CopyTeklaSupportingDlls" AfterTargets="Build">
+        <ItemGroup>
+            <_TeklaSupportingDlls Include="$(TeklaBinDir)\System.Memory.dll" />
+            <_TeklaSupportingDlls Include="$(TeklaBinDir)\System.Buffers.dll" />
+            <_TeklaSupportingDlls Include="$(TeklaBinDir)\System.Threading.Tasks.Extensions.dll" />
+            <_TeklaSupportingDlls Include="$(TeklaBinDir)\Microsoft.Bcl.AsyncInterfaces.dll" />
+            <_TeklaSupportingDlls Include="$(TeklaBinDir)\Microsoft.Extensions.Logging.Abstractions.dll" />
+        </ItemGroup>
+        <Copy SourceFiles="@(_TeklaSupportingDlls)"
+              DestinationFolder="$(OutputPath)"
+              SkipUnchangedFiles="true" />
+    </Target>
+
+</Project>

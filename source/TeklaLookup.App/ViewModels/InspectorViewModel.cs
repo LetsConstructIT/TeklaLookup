@@ -1,0 +1,297 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.ComponentModel;
+using System.Windows.Data;
+using System.Windows.Input;
+using TeklaLookup.App.Models;
+using TeklaLookup.App.Services;
+
+namespace TeklaLookup.App.ViewModels;
+
+/// <summary>
+/// Drives an <see cref="Views.InspectorWindow"/> — a standalone drill-down pane seeded with a
+/// single root target, used for multi-pane comparison alongside the main window. Reuses the
+/// same collector / visualizer / decomposer instances as the main view-model so overlays and
+/// identifier resolution stay coherent across windows.
+/// </summary>
+public sealed class InspectorViewModel : BaseViewModel
+{
+    private readonly TeklaObjectsCollector _collector;
+    private readonly DrawingsCollector _drawingsCollector;
+    private readonly GeometryVisualizer _visualizer;
+    private readonly ObjectDecomposer _decomposer;
+
+    private string _title;
+    private string _status = "Ready.";
+    private string? _currentTargetTitle;
+
+    public InspectorViewModel(
+        object target,
+        string title,
+        TeklaObjectsCollector collector,
+        DrawingsCollector drawingsCollector,
+        GeometryVisualizer visualizer,
+        ObjectDecomposer decomposer)
+    {
+        _collector = collector;
+        _drawingsCollector = drawingsCollector;
+        _visualizer = visualizer;
+        _decomposer = decomposer;
+        _title = $"TeklaLookup — {title}";
+
+        NavigateBackCommand = new RelayCommand(_ => NavigateBack(), _ => CanGoBack);
+        NavigateToFrameCommand = new RelayCommand(p => NavigateToFrame(p as DecompositionFrame));
+        DrillIntoCommand = new RelayCommand(p => DrillInto(p as PropertyEntry),
+            p => (p as PropertyEntry)?.IsDrillable == true);
+        OpenInNewWindowCommand = new RelayCommand(p => OpenInNewWindow(p as PropertyEntry),
+            p => (p as PropertyEntry)?.IsDrillable == true);
+
+        CopyPropertyValueCommand = new RelayCommand(p => CopyToClipboard((p as PropertyEntry)?.Value));
+        CopyPropertyNameCommand  = new RelayCommand(p => CopyToClipboard((p as PropertyEntry)?.Name));
+        CopyPropertyLineCommand  = new RelayCommand(p =>
+        {
+            if (p is PropertyEntry e) CopyToClipboard($"{e.Name} = {e.Value}");
+        });
+        HighlightCommand = new RelayCommand(p => Highlight(p as PropertyEntry),
+            p => (p as PropertyEntry)?.IsHighlightable == true);
+        SelectPropertyInTeklaCommand = new RelayCommand(
+            p => SelectPropertyInTekla(p as PropertyEntry),
+            p => HasShowableTarget(p as PropertyEntry));
+
+        PropertiesView = CollectionViewSource.GetDefaultView(Properties);
+        PropertiesView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PropertyEntry.Category)));
+
+        Trail.Add(new DecompositionFrame(target, title));
+        RenderCurrent();
+    }
+
+    public string Title
+    {
+        get => _title;
+        private set => SetProperty(ref _title, value);
+    }
+
+    public string Status
+    {
+        get => _status;
+        private set => SetProperty(ref _status, value);
+    }
+
+    public string? CurrentTargetTitle
+    {
+        get => _currentTargetTitle;
+        private set => SetProperty(ref _currentTargetTitle, value);
+    }
+
+    public bool CanGoBack => Trail.Count > 1;
+
+    public ObservableCollection<DecompositionFrame> Trail { get; } = new();
+    public ObservableCollection<PropertyEntry> Properties { get; } = new();
+    public ICollectionView PropertiesView { get; }
+
+    public ICommand NavigateBackCommand { get; }
+    public ICommand NavigateToFrameCommand { get; }
+    public ICommand DrillIntoCommand { get; }
+    public ICommand OpenInNewWindowCommand { get; }
+    public ICommand CopyPropertyValueCommand { get; }
+    public ICommand CopyPropertyNameCommand { get; }
+    public ICommand CopyPropertyLineCommand { get; }
+    public ICommand HighlightCommand { get; }
+    public ICommand SelectPropertyInTeklaCommand { get; }
+
+    private void DrillInto(PropertyEntry? entry)
+    {
+        if (entry is null || !entry.IsDrillable || entry.RawValue is null) return;
+        try
+        {
+            var target = entry.RawValue;
+            if (target is IEnumerable enumerable && target is not string && target is not IDictionary)
+                target = enumerable.Cast<object?>().ToList();
+
+            Trail.Add(new DecompositionFrame(target, $"{entry.Name} : {entry.ValueType}"));
+            RenderCurrent();
+            Status = $"Decomposed {entry.Name}.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed to drill into {entry.Name}: {ex.Message}";
+        }
+    }
+
+    private void OpenInNewWindow(PropertyEntry? entry)
+    {
+        if (entry is null || !entry.IsDrillable || entry.RawValue is null) return;
+        var target = entry.RawValue;
+        if (target is IEnumerable enumerable && target is not string && target is not IDictionary)
+            target = enumerable.Cast<object?>().ToList();
+        InspectorWindowFactory.Open(target, $"{entry.Name} : {entry.ValueType}",
+            _collector, _drawingsCollector, _visualizer, _decomposer);
+    }
+
+    private void NavigateBack()
+    {
+        if (Trail.Count <= 1) return;
+        Trail.RemoveAt(Trail.Count - 1);
+        RenderCurrent();
+    }
+
+    private void NavigateToFrame(DecompositionFrame? frame)
+    {
+        if (frame is null) return;
+        var index = Trail.IndexOf(frame);
+        if (index < 0) return;
+        while (Trail.Count > index + 1)
+            Trail.RemoveAt(Trail.Count - 1);
+        RenderCurrent();
+    }
+
+    private void RenderCurrent()
+    {
+        Properties.Clear();
+        if (Trail.Count == 0)
+        {
+            CurrentTargetTitle = null;
+        }
+        else
+        {
+            var frame = Trail[Trail.Count - 1];
+            CurrentTargetTitle = frame.Title;
+            try
+            {
+                foreach (var entry in _decomposer.Decompose(frame.Target))
+                    Properties.Add(entry);
+            }
+            catch (Exception ex)
+            {
+                Status = $"Failed to decompose object: {ex.Message}";
+            }
+        }
+        OnPropertyChanged(nameof(CanGoBack));
+    }
+
+    private void Highlight(PropertyEntry? entry)
+    {
+        if (entry is null) return;
+        try
+        {
+            Status = _visualizer.TryHighlight(entry.RawValue)
+                ? $"Drew overlay for {entry.Name}."
+                : $"Can't visualize {entry.Name} ({entry.ValueType}).";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed to draw overlay: {ex.Message}";
+        }
+    }
+
+    private void SelectPropertyInTekla(PropertyEntry? entry)
+    {
+        if (entry?.RawValue is null) return;
+        var modelObjects = CollectModelObjects(entry).ToList();
+        var drawingObjects = CollectDrawingObjects(entry).ToList();
+        if (modelObjects.Count == 0 && drawingObjects.Count == 0) return;
+        try
+        {
+            if (modelObjects.Count > 0)
+                _collector.SelectInModel(modelObjects);
+            if (drawingObjects.Count > 0)
+                _drawingsCollector.SelectInDrawing(drawingObjects);
+            Status = $"Selected {modelObjects.Count + drawingObjects.Count} object(s) in Tekla.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed to show in Tekla: {ex.Message}";
+        }
+    }
+
+    private bool HasShowableTarget(PropertyEntry? entry)
+        => CollectModelObjects(entry).Any() || CollectDrawingObjects(entry).Any();
+
+    private IEnumerable<Tekla.Structures.Model.ModelObject> CollectModelObjects(PropertyEntry? entry)
+    {
+        if (entry?.RawValue is null) yield break;
+        foreach (var mo in ToModelObjects(entry.RawValue))
+            yield return mo;
+    }
+
+    private IEnumerable<Tekla.Structures.Model.ModelObject> ToModelObjects(object value)
+    {
+        switch (value)
+        {
+            case Tekla.Structures.Model.ModelObject mo:
+                yield return mo;
+                yield break;
+            case Tekla.Structures.Identifier id:
+                var resolved = _collector.ResolveIdentifier(id);
+                if (resolved is not null) yield return resolved;
+                yield break;
+            case string:
+                yield break;
+            case IEnumerable list:
+                foreach (var item in list)
+                {
+                    if (item is null) continue;
+                    foreach (var m in ToModelObjects(item))
+                        yield return m;
+                }
+                yield break;
+        }
+    }
+
+    private static IEnumerable<Tekla.Structures.Drawing.DrawingObject> CollectDrawingObjects(PropertyEntry? entry)
+    {
+        if (entry?.RawValue is null) yield break;
+        foreach (var d in ToDrawingObjects(entry.RawValue))
+            yield return d;
+    }
+
+    private static IEnumerable<Tekla.Structures.Drawing.DrawingObject> ToDrawingObjects(object value)
+    {
+        switch (value)
+        {
+            case Tekla.Structures.Drawing.DrawingObject d:
+                yield return d;
+                yield break;
+            case string:
+                yield break;
+            case IEnumerable list:
+                foreach (var item in list)
+                {
+                    if (item is null) continue;
+                    foreach (var d in ToDrawingObjects(item))
+                        yield return d;
+                }
+                yield break;
+        }
+    }
+
+    private static void CopyToClipboard(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        try { System.Windows.Clipboard.SetText(text); }
+        catch { /* best effort */ }
+    }
+}
+
+internal static class InspectorWindowFactory
+{
+    public static void Open(
+        object target,
+        string title,
+        TeklaObjectsCollector collector,
+        DrawingsCollector drawingsCollector,
+        GeometryVisualizer visualizer,
+        ObjectDecomposer decomposer)
+    {
+        var vm = new InspectorViewModel(target, title, collector, drawingsCollector, visualizer, decomposer);
+        var window = new Views.InspectorWindow
+        {
+            DataContext = vm,
+            Owner = System.Windows.Application.Current?.MainWindow,
+        };
+        window.Show();
+    }
+}

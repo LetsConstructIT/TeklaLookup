@@ -1,0 +1,4 @@
+<Project>
+    <!-- Intentionally empty: shadows the repo-root Directory.Packages.props so this subtree
+         does not inherit central package management or Revit package versions. -->
+</Project>

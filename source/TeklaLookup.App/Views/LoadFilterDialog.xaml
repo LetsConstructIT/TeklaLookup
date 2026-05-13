@@ -1,0 +1,49 @@
+<ui:FluentWindow x:Class="TeklaLookup.App.Views.LoadFilterDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://lookupengine.com/xaml"
+        xmlns:vm="clr-namespace:TeklaLookup.App.ViewModels"
+        Title="Load by type"
+        Height="480" Width="380"
+        WindowStartupLocation="CenterOwner"
+        WindowBackdropType="Mica"
+        ExtendsContentIntoTitleBar="True"
+        WindowCornerPreference="Round"
+        ResizeMode="NoResize">
+    <Window.DataContext>
+        <vm:LoadFilterDialogViewModel />
+    </Window.DataContext>
+    <DockPanel>
+        <ui:TitleBar DockPanel.Dock="Top" Title="Load by type" />
+
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="16,8,16,8">
+            <Button Content="Select all" Command="{Binding SelectAllCommand}"
+                    Padding="8,2" Margin="0,0,8,0" />
+            <Button Content="Clear"      Command="{Binding ClearAllCommand}"
+                    Padding="8,2" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="16,8,16,16">
+            <ui:Button Content="Load" Appearance="Primary"
+                       Click="OnLoadClicked"
+                       IsDefault="True"
+                       Padding="14,4" Margin="0,0,8,0" />
+            <Button Content="Cancel" IsCancel="True" Padding="14,4" />
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Margin="16,0,16,8">
+            <ItemsControl ItemsSource="{Binding Types}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox Content="{Binding DisplayName}"
+                                  IsChecked="{Binding IsSelected}"
+                                  Margin="0,4,0,4" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</ui:FluentWindow>
