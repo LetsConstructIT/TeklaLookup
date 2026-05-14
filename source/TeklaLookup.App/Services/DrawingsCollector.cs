@@ -49,16 +49,14 @@ public sealed class DrawingsCollector
         public int Attempted { get; set; }       // items handed to Tekla
         public int Selected { get; set; }        // items Tekla actually highlighted
         public int Skipped { get; set; }         // belonged to another drawing
-        public int SkippedViews { get; set; }    // ViewBase / container instances
         public bool BatchAccepted { get; set; }  // first SelectObjects(...) call return
         public bool FellBackToSingles { get; set; }
     }
 
     /// <summary>
-    /// Selects the given drawing objects in the currently active drawing editor. Filters in two
-    /// passes: cross-drawing items (their parent drawing isn't open) and <see cref="ViewBase"/>
-    /// containers (Tekla rejects whole batches that mix selectable shapes with view containers).
-    /// Caller should ensure the relevant drawing is open first (e.g. via <see cref="OpenInTekla"/>).
+    /// Selects the given drawing objects in the currently active drawing editor. Items whose
+    /// parent drawing isn't the active one are skipped. Caller should ensure the relevant
+    /// drawing is open first (e.g. via <see cref="OpenInTekla"/>).
     /// </summary>
     public DrawingSelectionResult SelectInDrawing(IEnumerable<DrawingObject> drawingObjects)
     {
@@ -73,14 +71,6 @@ public sealed class DrawingsCollector
             if (owner is null || !owner.IsSameDatabaseObject(active))
             {
                 result.Skipped++;
-                continue;
-            }
-            if (obj is ViewBase)
-            {
-                // Views and ContainerViews aren't visually selectable in the editor — including
-                // them poisons the whole batch so SelectObjects returns false and nothing is
-                // highlighted. Drop them and select only leaf drawing objects.
-                result.SkippedViews++;
                 continue;
             }
             list.Add(obj);

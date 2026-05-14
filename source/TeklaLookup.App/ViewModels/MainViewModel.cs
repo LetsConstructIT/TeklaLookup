@@ -588,8 +588,6 @@ public class MainViewModel : BaseViewModel
             }
             if (drawing.Skipped > 0)
                 parts.Add($"{drawing.Skipped} object(s) skipped (their drawing isn't open)");
-            if (drawing.SkippedViews > 0)
-                parts.Add($"{drawing.SkippedViews} view container(s) skipped (not selectable)");
         }
         return string.Join("; ", parts) + ".";
     }
