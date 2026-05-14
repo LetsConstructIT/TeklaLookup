@@ -4,6 +4,7 @@
         xmlns:ui="http://lookupengine.com/xaml"
         xmlns:vm="clr-namespace:TeklaLookup.App.ViewModels"
         Title="Event monitor"
+        Icon="pack://application:,,,/Resources/AppIcon.ico"
         Height="520" Width="820"
         WindowStartupLocation="CenterOwner"
         WindowBackdropType="Mica"
