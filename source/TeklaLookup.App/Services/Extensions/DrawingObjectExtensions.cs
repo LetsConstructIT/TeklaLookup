@@ -33,14 +33,23 @@ public sealed class ViewBaseExtensions : TeklaTypeExtension<ViewBase>
     }
 }
 
-public sealed class MarkExtensions : TeklaTypeExtension<Mark>
+public sealed class MarkBaseExtensions : TeklaTypeExtension<MarkBase>
 {
-    protected override IEnumerable<PropertyEntry> ResolveCore(Mark target)
+    protected override IEnumerable<PropertyEntry> ResolveCore(MarkBase target)
     {
-        // Mark.Attributes is reflected already; nothing method-only worth adding beyond the
-        // DrawingObject base accessors. Empty body keeps the type explicitly registered so future
-        // members have a clear home.
-        yield break;
+        yield return Entry("AxisAlignedBoundingBox",   () => target.GetAxisAlignedBoundingBox(),   "RectangleBoundingBox");
+        yield return Entry("ObjectAlignedBoundingBox", () => target.GetObjectAlignedBoundingBox(), "RectangleBoundingBox");
+        yield return Entry("Objects",                  () => target.GetObjects(),                  "DrawingObjectEnumerator");
+    }
+}
+
+public sealed class WeldMarkExtensions : TeklaTypeExtension<WeldMark>
+{
+    protected override IEnumerable<PropertyEntry> ResolveCore(WeldMark target)
+    {
+        yield return Entry("AxisAlignedBoundingBox",   () => target.GetAxisAlignedBoundingBox(),   "RectangleBoundingBox");
+        yield return Entry("ObjectAlignedBoundingBox", () => target.GetObjectAlignedBoundingBox(), "RectangleBoundingBox");
+        yield return Entry("Objects",                  () => target.GetObjects(),                  "DrawingObjectEnumerator");
     }
 }
 
