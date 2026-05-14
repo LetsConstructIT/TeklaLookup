@@ -43,6 +43,7 @@ public sealed class InspectorViewModel : BaseViewModel
         _title = $"TeklaLookup — {title}";
 
         NavigateBackCommand = new RelayCommand(_ => NavigateBack(), _ => CanGoBack);
+        RefreshCommand = new RelayCommand(_ => Refresh(), _ => Trail.Count > 0);
         NavigateToFrameCommand = new RelayCommand(p => NavigateToFrame(p as DecompositionFrame));
         DrillIntoCommand = new RelayCommand(p => DrillInto(p as PropertyEntry),
             p => (p as PropertyEntry)?.IsDrillable == true);
@@ -93,6 +94,7 @@ public sealed class InspectorViewModel : BaseViewModel
     public ICollectionView PropertiesView { get; }
 
     public ICommand NavigateBackCommand { get; }
+    public ICommand RefreshCommand { get; }
     public ICommand NavigateToFrameCommand { get; }
     public ICommand DrillIntoCommand { get; }
     public ICommand OpenInNewWindowCommand { get; }
@@ -129,6 +131,35 @@ public sealed class InspectorViewModel : BaseViewModel
             target = enumerable.Cast<object?>().ToList();
         InspectorWindowFactory.Open(target, $"{entry.Name} : {entry.ValueType}",
             _collector, _drawingsCollector, _visualizer, _decomposer);
+    }
+
+    /// <summary>
+    /// Re-runs decomposition on the current frame, picking up any changes made in Tekla since
+    /// the frame was opened. For model / drawing objects we call <c>Select()</c> first to pull
+    /// fresh database state, since Tekla wrappers cache property values until refreshed.
+    /// </summary>
+    private void Refresh()
+    {
+        if (Trail.Count == 0) return;
+        try
+        {
+            var frame = Trail[Trail.Count - 1];
+            switch (frame.Target)
+            {
+                case Tekla.Structures.Model.ModelObject mo:
+                    try { mo.Select(); } catch { /* best effort */ }
+                    break;
+                case Tekla.Structures.Drawing.DrawingObject d:
+                    try { d.Select(); } catch { /* best effort */ }
+                    break;
+            }
+            RenderCurrent();
+            Status = $"Refreshed {frame.Title}.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed to refresh: {ex.Message}";
+        }
     }
 
     private void NavigateBack()

@@ -11,6 +11,7 @@
         WindowCornerPreference="Round">
     <ui:FluentWindow.InputBindings>
         <KeyBinding Key="Left" Modifiers="Alt" Command="{Binding NavigateBackCommand}" />
+        <KeyBinding Key="F5" Command="{Binding RefreshCommand}" />
     </ui:FluentWindow.InputBindings>
     <ui:FluentWindow.Resources>
         <!--
@@ -236,10 +237,15 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0"
-                            Content="← Back"
-                            Command="{Binding NavigateBackCommand}"
-                            Padding="8,2" Margin="0,0,8,0" />
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
+                        <Button Content="← Back"
+                                Command="{Binding NavigateBackCommand}"
+                                Padding="8,2" Margin="0,0,4,0" />
+                        <ui:Button Command="{Binding RefreshCommand}"
+                                   Icon="{ui:SymbolIcon ArrowSync24}"
+                                   Padding="8,2"
+                                   ToolTip="Re-decompose current object (F5)" />
+                    </StackPanel>
                     <ItemsControl Grid.Column="1"
                                   ItemsSource="{Binding Trail}"
                                   VerticalAlignment="Center">

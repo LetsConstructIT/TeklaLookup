@@ -40,6 +40,7 @@ public class MainViewModel : BaseViewModel
         PickObjectCommand = new RelayCommand(_ => PickObject(), _ => !IsBusy);
         PickObjectsCommand = new RelayCommand(_ => PickObjects(), _ => !IsBusy);
         NavigateBackCommand = new RelayCommand(_ => NavigateBack(), _ => CanGoBack);
+        RefreshCommand = new RelayCommand(_ => Refresh(), _ => !IsBusy && Trail.Count > 0);
         NavigateToFrameCommand = new RelayCommand(p => NavigateToFrame(p as DecompositionFrame));
         DrillIntoCommand = new RelayCommand(p => DrillInto(p as PropertyEntry), p => (p as PropertyEntry)?.IsDrillable == true);
         OpenInNewWindowCommand = new RelayCommand(p => OpenInNewWindow(p as PropertyEntry), p => (p as PropertyEntry)?.IsDrillable == true);
@@ -180,6 +181,7 @@ public class MainViewModel : BaseViewModel
     public ICommand PickObjectCommand { get; }
     public ICommand PickObjectsCommand { get; }
     public ICommand NavigateBackCommand { get; }
+    public ICommand RefreshCommand { get; }
     public ICommand NavigateToFrameCommand { get; }
     public ICommand DrillIntoCommand { get; }
     public ICommand OpenInNewWindowCommand { get; }
@@ -849,6 +851,48 @@ public class MainViewModel : BaseViewModel
         catch (Exception ex)
         {
             Status = $"Failed to open new window: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Re-runs decomposition on the current frame, picking up any changes the user made in Tekla
+    /// since the frame was opened (UDA edits, attribute changes, geometry edits). For model and
+    /// drawing objects we also call <c>Select()</c> first to pull fresh database state, since
+    /// Tekla's wrapper objects cache their property values until refreshed.
+    /// </summary>
+    private void Refresh()
+    {
+        if (Trail.Count == 0) return;
+        try
+        {
+            IsBusy = true;
+            var frame = Trail[Trail.Count - 1];
+            RefreshTarget(frame.Target);
+            Status = $"Refreshing {frame.Title}…";
+            PumpDispatcher();
+            RenderCurrent();
+            Status = $"Refreshed {frame.Title}.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed to refresh: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private static void RefreshTarget(object? target)
+    {
+        switch (target)
+        {
+            case Tekla.Structures.Model.ModelObject mo:
+                try { mo.Select(); } catch { /* best effort */ }
+                break;
+            case Tekla.Structures.Drawing.DrawingObject d:
+                try { d.Select(); } catch { /* best effort */ }
+                break;
         }
     }
 
