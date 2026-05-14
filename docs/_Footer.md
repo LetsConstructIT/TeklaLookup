@@ -1,1 +1,0 @@
-[Go back to the home page](https://github.com/lookup-foundation/RevitLookup/wiki)

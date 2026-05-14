@@ -1,0 +1,14 @@
+<Solution>
+    <Configurations>
+        <BuildType Name="Debug" />
+        <BuildType Name="Release" />
+    </Configurations>
+    <Folder Name="/Solution Items/">
+        <File Path="Readme.md" />
+    </Folder>
+    <Folder Name="/Frontend/">
+        <Project Path="source/LookupEngine.UI/source/LookupEngine.UI.Abstractions/LookupEngine.UI.Abstractions.csproj" />
+        <Project Path="source/LookupEngine.UI/source/LookupEngine.UI/LookupEngine.UI.csproj" />
+    </Folder>
+    <Project Path="source/TeklaLookup.App/TeklaLookup.App.csproj" />
+</Solution>

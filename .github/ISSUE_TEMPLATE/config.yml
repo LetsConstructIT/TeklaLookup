@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: 📃 RevitLookup user documentation
-    url: https://github.com/jeremytammik/RevitLookup/wiki
-    about: Documentation for users of RevitLookup tool.
-  - name: 📃 RevitLookup dev documentation
-    url: https://github.com/jeremytammik/RevitLookup/blob/dev/Contributing.md
-    about: Documentation for people interested in developing and contributing for RevitLookup.

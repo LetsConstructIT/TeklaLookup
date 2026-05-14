@@ -1,7 +1,3 @@
-﻿[submodule "source/LookupEngine"]
-	path = source/LookupEngine
-	url = https://github.com/LookupEngine/LookupEngine.git
-
 [submodule "source/LookupEngine.UI"]
 	path = source/LookupEngine.UI
 	url = https://github.com/LookupEngine/LookupEngine.UI.git
