@@ -370,6 +370,11 @@ public class MainViewModel : BaseViewModel
                 Status = $"Resolved {Objects.Count} of {tokens.Length} token(s).";
             else
                 Status = $"Resolved {Objects.Count} of {tokens.Length}; missed: {string.Join(", ", misses.Take(5))}{(misses.Count > 5 ? "…" : "")}";
+
+            // With a single result there's nothing to choose between — surface its details
+            // immediately instead of making the user click the lone row.
+            if (Objects.Count == 1)
+                SelectedObject = Objects[0];
         }
         catch (Exception ex)
         {
@@ -390,9 +395,6 @@ public class MainViewModel : BaseViewModel
                 ? Enumerable.Empty<TeklaObjectSnapshot>()
                 : new[] { picked.ToSnapshot(_collector) };
         });
-
-        if (Objects.Count == 1)
-            SelectedObject = Objects[0];
     }
 
     private void PickObjects()
@@ -432,6 +434,11 @@ public class MainViewModel : BaseViewModel
                 Objects.Add(snapshot);
 
             Status = $"Loaded {Objects.Count} {label}.";
+
+            // With a single result there's nothing to choose between — surface its details
+            // immediately instead of making the user click the lone row.
+            if (Objects.Count == 1)
+                SelectedObject = Objects[0];
         }
         catch (Exception ex)
         {
