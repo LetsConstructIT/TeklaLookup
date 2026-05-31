@@ -33,6 +33,7 @@ public sealed class TeklaExtensionRegistry
             new SingleRebarExtensions(),
             new RebarSetExtensions(),
             new ComponentExtensions(),
+            new InputItemExtensions(),
             new ConnectionExtensions(),
             new DetailExtensions(),
             new SeamExtensions(),
