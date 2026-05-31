@@ -16,5 +16,7 @@ public sealed class ModelObjectExtensions : TeklaTypeExtension<ModelObject>
         }, nameof(Phase));
 
         yield return Entry("Children", () => target.GetChildren(), "ModelObjectEnumerator");
+
+        yield return Entry("FatherComponent", () => target.GetFatherComponent(), nameof(BaseComponent));
     }
 }
