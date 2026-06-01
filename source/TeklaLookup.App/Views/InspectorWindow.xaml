@@ -125,6 +125,9 @@
                                               Command="{Binding PlacementTarget.Tag.SelectPropertyInTeklaCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                               CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                     <Separator />
+                                    <MenuItem Header="Save object as JSON (for LLM)…"
+                                              Command="{Binding PlacementTarget.Tag.DumpFrameJsonCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <Separator />
                                     <MenuItem Header="Copy value"
                                               Command="{Binding PlacementTarget.Tag.CopyPropertyValueCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                               CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />

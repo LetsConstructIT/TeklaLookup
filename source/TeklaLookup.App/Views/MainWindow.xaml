@@ -191,6 +191,10 @@
                                   Command="{Binding PlacementTarget.DataContext.OpenSnapshotInNewWindowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                         <Separator />
+                        <MenuItem Header="Save as JSON (for LLM)…"
+                                  Command="{Binding PlacementTarget.DataContext.DumpJsonCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Separator />
                         <MenuItem Header="Copy GUID"
                                   Command="{Binding PlacementTarget.DataContext.CopySnapshotGuidCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                   CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
@@ -321,6 +325,9 @@
                                         <MenuItem Header="Show in Tekla"
                                                   Command="{Binding PlacementTarget.Tag.SelectPropertyInTeklaCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                        <Separator />
+                                        <MenuItem Header="Save object as JSON (for LLM)…"
+                                                  Command="{Binding PlacementTarget.Tag.DumpFrameJsonCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                         <Separator />
                                         <MenuItem Header="Copy value"
                                                   Command="{Binding PlacementTarget.Tag.CopyPropertyValueCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"

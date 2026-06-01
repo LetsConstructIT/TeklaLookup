@@ -17,6 +17,7 @@ public class MainViewModel : BaseViewModel
     private readonly DrawingsCollector _drawingsCollector = new();
     private readonly ObjectDecomposer _decomposer = new();
     private readonly GeometryVisualizer _visualizer = new();
+    private readonly JsonObjectDumper _jsonDumper = new();
 
     private string _title = "TeklaLookup";
     private string _status = "Ready.";
@@ -63,6 +64,10 @@ public class MainViewModel : BaseViewModel
         ShowInTeklaCommand = new RelayCommand(
             p => ShowInTekla(p),
             p => ExtractSnapshotsWithSource(p).Any());
+        DumpJsonCommand = new RelayCommand(
+            p => DumpJson(p),
+            p => ExtractSnapshotsWithSource(p).Any());
+        DumpFrameJsonCommand = new RelayCommand(_ => DumpFrameJson(), _ => Trail.Count > 0);
         HighlightCommand = new RelayCommand(p => Highlight(p as PropertyEntry),
             p => (p as PropertyEntry)?.IsHighlightable == true);
         ClearHighlightsCommand = new RelayCommand(_ => _visualizer.Clear());
@@ -196,6 +201,8 @@ public class MainViewModel : BaseViewModel
     public ICommand CopySnapshotIdCommand { get; }
     public ICommand CopySnapshotSummaryCommand { get; }
     public ICommand ShowInTeklaCommand { get; }
+    public ICommand DumpJsonCommand { get; }
+    public ICommand DumpFrameJsonCommand { get; }
     public ICommand HighlightCommand { get; }
     public ICommand ClearHighlightsCommand { get; }
     public ICommand SelectPropertyInTeklaCommand { get; }
@@ -684,6 +691,66 @@ public class MainViewModel : BaseViewModel
         catch (Exception ex)
         {
             Status = $"Failed to show in Tekla: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Writes a curated, creation-focused JSON dump of the selected object(s) to a file. The dump is
+    /// shaped for pasting into an LLM that recreates a similar object via the Tekla API — see
+    /// <see cref="JsonObjectDumper"/>. A single selection produces a JSON object; multiple produce an array.
+    /// </summary>
+    private void DumpJson(object? parameter)
+    {
+        var snapshots = ExtractSnapshotsWithSource(parameter).ToList();
+        if (snapshots.Count == 0) return;
+
+        try
+        {
+            var sources = snapshots.Select(s => s.Source!).ToList();
+            var json = (sources.Count == 1 ? _jsonDumper.Dump(sources[0]) : _jsonDumper.DumpMany(sources))
+                .ToIndentedString();
+
+            var suggestedName = snapshots.Count == 1
+                ? $"{snapshots[0].TypeName}_{snapshots[0].IdentifierId}.json"
+                : $"TeklaLookup_{snapshots.Count}_objects.json";
+
+            var path = JsonDumpFile.Save(json, suggestedName);
+            if (path is null)
+            {
+                Status = "JSON dump cancelled.";
+                return;
+            }
+
+            Status = snapshots.Count == 1
+                ? $"Saved JSON dump of {snapshots[0].TypeName} #{snapshots[0].IdentifierId} to {path}."
+                : $"Saved JSON dump of {snapshots.Count} objects to {path}.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed to dump JSON: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Dumps the object currently shown in the decomposition pane (the active trail frame) — including
+    /// any sub-object the user has drilled into — to a curated JSON file. See <see cref="JsonObjectDumper"/>.
+    /// </summary>
+    private void DumpFrameJson()
+    {
+        if (Trail.Count == 0) return;
+        var frame = Trail[Trail.Count - 1];
+
+        try
+        {
+            var json = _jsonDumper.DumpFrame(frame.Target).ToIndentedString();
+            var path = JsonDumpFile.Save(json, $"{frame.Title}.json");
+            Status = path is null
+                ? "JSON dump cancelled."
+                : $"Saved JSON dump of {frame.Title} to {path}.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed to dump JSON: {ex.Message}";
         }
     }
 

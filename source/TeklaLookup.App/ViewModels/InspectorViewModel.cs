@@ -23,6 +23,7 @@ public sealed class InspectorViewModel : BaseViewModel
     private readonly DrawingsCollector _drawingsCollector;
     private readonly GeometryVisualizer _visualizer;
     private readonly ObjectDecomposer _decomposer;
+    private readonly JsonObjectDumper _jsonDumper = new();
 
     private string _title;
     private string _status = "Ready.";
@@ -44,6 +45,7 @@ public sealed class InspectorViewModel : BaseViewModel
 
         NavigateBackCommand = new RelayCommand(_ => NavigateBack(), _ => CanGoBack);
         RefreshCommand = new RelayCommand(_ => Refresh(), _ => Trail.Count > 0);
+        DumpFrameJsonCommand = new RelayCommand(_ => DumpFrameJson(), _ => Trail.Count > 0);
         NavigateToFrameCommand = new RelayCommand(p => NavigateToFrame(p as DecompositionFrame));
         DrillIntoCommand = new RelayCommand(p => DrillInto(p as PropertyEntry),
             p => (p as PropertyEntry)?.IsDrillable == true);
@@ -95,6 +97,7 @@ public sealed class InspectorViewModel : BaseViewModel
 
     public ICommand NavigateBackCommand { get; }
     public ICommand RefreshCommand { get; }
+    public ICommand DumpFrameJsonCommand { get; }
     public ICommand NavigateToFrameCommand { get; }
     public ICommand DrillIntoCommand { get; }
     public ICommand OpenInNewWindowCommand { get; }
@@ -159,6 +162,29 @@ public sealed class InspectorViewModel : BaseViewModel
         catch (Exception ex)
         {
             Status = $"Failed to refresh: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Dumps the object currently shown in this pane (the active trail frame) to a curated JSON file,
+    /// shaped for recreating a similar object via the Tekla API. See <see cref="JsonObjectDumper"/>.
+    /// </summary>
+    private void DumpFrameJson()
+    {
+        if (Trail.Count == 0) return;
+        var frame = Trail[Trail.Count - 1];
+
+        try
+        {
+            var json = _jsonDumper.DumpFrame(frame.Target).ToIndentedString();
+            var path = JsonDumpFile.Save(json, $"{frame.Title}.json");
+            Status = path is null
+                ? "JSON dump cancelled."
+                : $"Saved JSON dump of {frame.Title} to {path}.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Failed to dump JSON: {ex.Message}";
         }
     }
 
