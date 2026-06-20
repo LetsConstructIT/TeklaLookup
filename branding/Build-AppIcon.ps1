@@ -3,136 +3,144 @@
     Generates source/TeklaLookup.App/Resources/AppIcon.ico from the design in AppIcon.svg.
 
 .DESCRIPTION
-    Re-draws the icon shapes via System.Drawing at multiple resolutions (16/24/32/48/64/128/256)
-    and packs them into a single Vista-style .ico (PNG-embedded for >=64, BMP-embedded for the
-    rest). No external SVG rasterizer needed.
+    Draws the icon (flat steel I-beam + magnifying glass, with the beam slice under the
+    lens lit blue) via WPF at multiple resolutions (16/24/32/48/64/128/256) and packs
+    them into a single Vista-style PNG-embedded .ico. WPF is used (instead of
+    System.Drawing) because the design needs a gradient stroke and a circular clip.
 
-    Run from the repo root or from this directory:
-        pwsh branding/Build-AppIcon.ps1
+    Pass -EmitSvg to print the beam <polygon> elements for pasting into AppIcon.svg.
+
+    No external SVG rasterizer needed, but WPF wants an STA thread:
+        pwsh -STA -ExecutionPolicy Bypass -File branding/Build-AppIcon.ps1
+        pwsh -STA -ExecutionPolicy Bypass -File branding/Build-AppIcon.ps1 -EmitSvg
 #>
 
 [CmdletBinding()]
 param(
-    [string]$OutPath = (Join-Path $PSScriptRoot '..\source\TeklaLookup.App\Resources\AppIcon.ico')
+    [string]$OutPath = (Join-Path $PSScriptRoot '..\source\TeklaLookup.App\Resources\AppIcon.ico'),
+    [switch]$EmitSvg
 )
 
-Add-Type -AssemblyName System.Drawing
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
 
-$BlueFrame  = [System.Drawing.Color]::FromArgb(0xFF, 0x00, 0x79, 0xC2)
-$WhitePanel = [System.Drawing.Color]::FromArgb(0xFF, 0xFF, 0xFF, 0xFF)
-$DarkGlyph  = [System.Drawing.Color]::FromArgb(0xFF, 0x1F, 0x1F, 0x1F)
+$sizes = 16, 24, 32, 48, 64, 128, 256
 
-function New-IconBitmap {
-    param([int]$Size)
+# --- Design (256-px space) ------------------------------------------------------
+$LensCenter = @(150, 116); $LensRadius = 56
 
-    $bmp = New-Object System.Drawing.Bitmap($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+# Flat I-beam (IPE cross-section), centered on the lens and taller than it so the
+# flanges read as a beam passing through the glass. Single closed outline; the slice
+# inside the lens is redrawn in blue (the "active = blue" idea from SmartSelect).
+$Ibeam = @(104,16, 196,16, 196,44, 166,44, 166,188, 196,188, 196,216,
+           104,216, 104,188, 134,188, 134,44, 104,44)
 
-    # Scale all shape coords from the 256-px master design
-    $s = $Size / 256.0
-    function Sc([double]$v) { return [single]($v * $s) }
+$GrayFill = 'B6C2D1'
 
-    # Blue rounded frame (256x256 master, corner radius 44)
-    $frameRadius = Sc 44
-    $framePath = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $framePath.AddArc(0, 0, $frameRadius * 2, $frameRadius * 2, 180, 90)
-    $framePath.AddArc((Sc 256) - $frameRadius * 2, 0, $frameRadius * 2, $frameRadius * 2, 270, 90)
-    $framePath.AddArc((Sc 256) - $frameRadius * 2, (Sc 256) - $frameRadius * 2, $frameRadius * 2, $frameRadius * 2, 0, 90)
-    $framePath.AddArc(0, (Sc 256) - $frameRadius * 2, $frameRadius * 2, $frameRadius * 2, 90, 90)
-    $framePath.CloseFigure()
-    $blueBrush = New-Object System.Drawing.SolidBrush($BlueFrame)
-    $g.FillPath($blueBrush, $framePath)
-    $blueBrush.Dispose()
-    $framePath.Dispose()
+# --- WPF helpers ----------------------------------------------------------------
+function Color([string]$hex) {
+    [System.Windows.Media.Color]::FromRgb(
+        [Convert]::ToInt32($hex.Substring(0,2),16),
+        [Convert]::ToInt32($hex.Substring(2,2),16),
+        [Convert]::ToInt32($hex.Substring(4,2),16))
+}
+function Brush([string]$hex, [double]$opacity = 1.0) {
+    $b = New-Object System.Windows.Media.SolidColorBrush (Color $hex); $b.Opacity = $opacity; $b
+}
+function Point($x, $y) { New-Object System.Windows.Point ($x, $y) }
 
-    # White inner panel (220x220 inset by 18 from each side, corner radius 30)
-    $panelRadius = Sc 30
-    $panelX = Sc 18; $panelY = Sc 18
-    $panelW = Sc 220; $panelH = Sc 220
-    $panelPath = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $panelPath.AddArc($panelX, $panelY, $panelRadius * 2, $panelRadius * 2, 180, 90)
-    $panelPath.AddArc($panelX + $panelW - $panelRadius * 2, $panelY, $panelRadius * 2, $panelRadius * 2, 270, 90)
-    $panelPath.AddArc($panelX + $panelW - $panelRadius * 2, $panelY + $panelH - $panelRadius * 2, $panelRadius * 2, $panelRadius * 2, 0, 90)
-    $panelPath.AddArc($panelX, $panelY + $panelH - $panelRadius * 2, $panelRadius * 2, $panelRadius * 2, 90, 90)
-    $panelPath.CloseFigure()
-    $whiteBrush = New-Object System.Drawing.SolidBrush($WhitePanel)
-    $g.FillPath($whiteBrush, $panelPath)
-    $whiteBrush.Dispose()
-    $panelPath.Dispose()
-
-    # Magnifying glass: lens ring + diagonal handle
-    $glyphPen = New-Object System.Drawing.Pen($DarkGlyph, (Sc 18))
-    $glyphPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $glyphPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-    # Lens: center (108,108), radius 44 → bounding box at (64,64) size 88x88
-    $g.DrawEllipse($glyphPen, (Sc 64), (Sc 64), (Sc 88), (Sc 88))
-    $glyphPen.Dispose()
-
-    $handlePen = New-Object System.Drawing.Pen($DarkGlyph, (Sc 22))
-    $handlePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $handlePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $g.DrawLine($handlePen, (Sc 142), (Sc 142), (Sc 198), (Sc 198))
-    $handlePen.Dispose()
-
-    $g.Dispose()
-    return $bmp
+function New-Polygon([double[]]$pts, $brush) {
+    $fig = New-Object System.Windows.Media.PathFigure
+    $fig.StartPoint = Point $pts[0] $pts[1]; $fig.IsClosed = $true
+    for ($i = 2; $i -lt $pts.Length; $i += 2) {
+        $fig.Segments.Add((New-Object System.Windows.Media.LineSegment ((Point $pts[$i] $pts[$i+1]), $true)))
+    }
+    $geo = New-Object System.Windows.Media.PathGeometry; $geo.Figures.Add($fig)
+    $d = New-Object System.Windows.Media.GeometryDrawing; $d.Geometry = $geo; $d.Brush = $brush; $d
 }
 
-function ConvertTo-PngBytes {
-    param([System.Drawing.Bitmap]$Bitmap)
-    $ms = New-Object System.IO.MemoryStream
-    $Bitmap.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-    # Comma-wrap so PowerShell doesn't enumerate the byte[] into the pipeline.
-    return ,$ms.ToArray()
+function New-Gradient([string]$top, [string]$bottom) {
+    $g = New-Object System.Windows.Media.LinearGradientBrush
+    $g.StartPoint = Point 0 0; $g.EndPoint = Point 0 1
+    $g.GradientStops.Add((New-Object System.Windows.Media.GradientStop ((Color $top), 0.0)))
+    $g.GradientStops.Add((New-Object System.Windows.Media.GradientStop ((Color $bottom), 1.0)))
+    $g
+}
+# Blue brand gradient for the magnifier (same as SmartSelect); amber->orange accent
+# for the beam slice under the glass, so the "lookup hit" reads distinct from the lens.
+function New-BlueBrush   { New-Gradient '3B82F6' '1D4FD7' }
+function New-AccentBrush { New-Gradient 'FBBF24' 'F97316' }
+
+function New-LogoDrawing {
+    $root = New-Object System.Windows.Media.DrawingGroup
+
+    # Gray I-beam.
+    $root.Children.Add((New-Polygon $Ibeam (Brush $GrayFill)))
+
+    # The beam slice under the glass, in the amber accent (the lookup hit).
+    $hitGroup = New-Object System.Windows.Media.DrawingGroup
+    $hitGroup.ClipGeometry = New-Object System.Windows.Media.EllipseGeometry ((Point $LensCenter[0] $LensCenter[1]), $LensRadius, $LensRadius)
+    $hitGroup.Children.Add((New-Polygon $Ibeam (New-AccentBrush)))
+    $root.Children.Add($hitGroup)
+
+    $ring = New-BlueBrush
+
+    # Magnifier handle. Starts just outside the lens ring (its round cap tucks under
+    # the ring) so it doesn't poke into the glass.
+    $handle = New-Object System.Windows.Media.GeometryDrawing
+    $handle.Geometry = New-Object System.Windows.Media.LineGeometry ((Point 193 163), (Point 232 206))
+    $hp = New-Object System.Windows.Media.Pen ($ring, 24); $hp.StartLineCap = 'Round'; $hp.EndLineCap = 'Round'
+    $handle.Pen = $hp; $root.Children.Add($handle)
+
+    # Lens: faint glass fill + thick gradient ring.
+    $lens = New-Object System.Windows.Media.GeometryDrawing
+    $lens.Geometry = New-Object System.Windows.Media.EllipseGeometry ((Point $LensCenter[0] $LensCenter[1]), $LensRadius, $LensRadius)
+    $lens.Brush = Brush 'FFFFFF' 0.10
+    $lens.Pen = New-Object System.Windows.Media.Pen ($ring, 16); $root.Children.Add($lens)
+
+    return $root
 }
 
-# Build .ico file: header + N directory entries + N image payloads.
-# Header (6 bytes): reserved=0, type=1 (icon), count=N
-# Each directory entry (16 bytes): width, height, colors, reserved, planes, bitcount,
-#   bytesInRes, imageOffset
-$sizes = @(16, 24, 32, 48, 64, 128, 256)
-$images = @()
-foreach ($size in $sizes) {
-    $bmp = New-IconBitmap -Size $size
-    $png = ConvertTo-PngBytes -Bitmap $bmp
-    $bmp.Dispose()
-    $images += [pscustomobject]@{ Size = $size; Bytes = $png }
+# --- SVG emit (for keeping AppIcon.svg in sync) ---------------------------------
+if ($EmitSvg) {
+    $pairs = for ($i = 0; $i -lt $Ibeam.Length; $i += 2) { "$($Ibeam[$i]),$($Ibeam[$i+1])" }
+    $pts = $pairs -join ' '
+    Write-Output "  <polygon points=`"$pts`" fill=`"#$GrayFill`"/>            <!-- gray beam -->"
+    Write-Output "  <polygon points=`"$pts`" fill=`"url(#hit)`" clip-path=`"url(#lens)`"/>  <!-- accent slice -->"
+    return
 }
 
-$ms = New-Object System.IO.MemoryStream
-$bw = New-Object System.IO.BinaryWriter($ms)
-$bw.Write([uint16]0)             # Reserved
-$bw.Write([uint16]1)             # Type: icon
-$bw.Write([uint16]$images.Count) # Image count
+# --- Render + pack --------------------------------------------------------------
+function Convert-ToPng([int]$size) {
+    $vis = New-Object System.Windows.Media.DrawingVisual
+    $ctx = $vis.RenderOpen()
+    $ctx.PushTransform((New-Object System.Windows.Media.ScaleTransform (($size/256.0), ($size/256.0))))
+    $ctx.DrawDrawing((New-LogoDrawing)); $ctx.Pop(); $ctx.Close()
+    $rtb = New-Object System.Windows.Media.Imaging.RenderTargetBitmap ($size, $size, 96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
+    $rtb.Render($vis)
+    $enc = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
+    $enc.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($rtb))
+    $ms = New-Object System.IO.MemoryStream; $enc.Save($ms); return ,$ms.ToArray()
+}
 
-$headerSize = 6 + (16 * $images.Count)
-$cursor = $headerSize
-foreach ($img in $images) {
-    $w = if ($img.Size -ge 256) { 0 } else { $img.Size }   # 0 means 256 in ICO format
-    $h = $w
-    $bw.Write([byte]$w)            # Width
-    $bw.Write([byte]$h)            # Height
-    $bw.Write([byte]0)             # Color count (0 for >=8bpp)
-    $bw.Write([byte]0)             # Reserved
-    $bw.Write([uint16]1)           # Color planes
-    $bw.Write([uint16]32)          # Bits per pixel
-    $bw.Write([uint32]$img.Bytes.Length) # Bytes in resource
-    $bw.Write([uint32]$cursor)     # Offset to image data
-    $cursor += $img.Bytes.Length
-}
-foreach ($img in $images) {
-    $bw.Write($img.Bytes)
-}
-$bw.Flush()
+$pngs = @{}
+foreach ($s in $sizes) { $pngs[$s] = Convert-ToPng $s }
 
 $resolved = [System.IO.Path]::GetFullPath($OutPath)
 $dir = [System.IO.Path]::GetDirectoryName($resolved)
 if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-[System.IO.File]::WriteAllBytes($resolved, $ms.ToArray())
-$bw.Dispose()
-$ms.Dispose()
 
-Write-Output ("Wrote {0} ({1:n0} bytes, {2} sizes)" -f $resolved, (Get-Item $resolved).Length, $images.Count)
+$fs = [System.IO.File]::Create($resolved)
+$bw = New-Object System.IO.BinaryWriter $fs
+$bw.Write([uint16]0); $bw.Write([uint16]1); $bw.Write([uint16]$sizes.Count)
+$offset = 6 + (16 * $sizes.Count)
+foreach ($s in $sizes) {
+    $dim = if ($s -ge 256) { 0 } else { $s }
+    $bw.Write([byte]$dim); $bw.Write([byte]$dim); $bw.Write([byte]0); $bw.Write([byte]0)
+    $bw.Write([uint16]1); $bw.Write([uint16]32); $bw.Write([uint32]$pngs[$s].Length); $bw.Write([uint32]$offset)
+    $offset += $pngs[$s].Length
+}
+foreach ($s in $sizes) { $bw.Write($pngs[$s]) }
+$bw.Flush(); $bw.Close(); $fs.Close()
+
+Write-Output ("Wrote {0} ({1:n0} bytes, {2} sizes)" -f $resolved, (Get-Item $resolved).Length, $sizes.Count)
