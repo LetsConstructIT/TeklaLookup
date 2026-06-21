@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using Tekla.Structures.Model;
 using TeklaLookup.App.Models;
 
@@ -6,10 +7,15 @@ namespace TeklaLookup.App.Services.Extensions;
 
 public sealed class ReinforcementExtensions : TeklaTypeExtension<Reinforcement>
 {
+    // Reinforcement.GetAssembly was added in Tekla 2022; resolved at runtime so the 2021-floor
+    // build still surfaces it on a newer Tekla (omitted on 2021). See OptionalTeklaApi.
+    private static readonly MethodInfo? GetAssemblyMethod = OptionalTeklaApi.Method(typeof(Reinforcement), "GetAssembly");
+
     protected override IEnumerable<PropertyEntry> ResolveCore(Reinforcement target)
     {
         yield return Entry("Solid",          () => target.GetSolid(),                  "Solid");
-        yield return Entry("Assembly",       () => target.GetAssembly(),               "Assembly");
+        if (GetAssemblyMethod is not null)
+            yield return Entry("Assembly",   () => GetAssemblyMethod.Invoke(target, null), "Assembly");
         yield return Entry("FatherPour",     () => target.GetFatherPour(),             "PourObject");
         yield return Entry("FatherPourUnit", () => target.GetFatherPourUnit(),         "PourUnit");
         yield return Entry("NumberOfRebars", () => target.GetNumberOfRebars(),         "int");

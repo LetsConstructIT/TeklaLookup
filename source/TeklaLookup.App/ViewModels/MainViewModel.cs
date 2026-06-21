@@ -27,6 +27,12 @@ public class MainViewModel : BaseViewModel
     private string? _currentTargetTitle;
     private string _searchText = string.Empty;
 
+    // ViewHandler.GetActiveView was added in Tekla 2024. Resolved once at runtime so the
+    // 2021-floor build enables the command only on a Tekla that actually has it.
+    private static readonly System.Reflection.MethodInfo? GetActiveViewMethod =
+        OptionalTeklaApi.Method(typeof(Tekla.Structures.Model.UI.ViewHandler), "GetActiveView");
+    private static bool ActiveViewSupported => GetActiveViewMethod is not null;
+
     public MainViewModel()
     {
         LoadSelectedCommand = new RelayCommand(_ => LoadSelected(), _ => !IsBusy);
@@ -34,7 +40,8 @@ public class MainViewModel : BaseViewModel
         LoadByTypeCommand = new RelayCommand(_ => LoadByType(), _ => !IsBusy);
         SearchByIdCommand = new RelayCommand(_ => SearchById(), _ => !IsBusy);
         LoadModelRootCommand = new RelayCommand(_ => LoadModelRoot(), _ => !IsBusy);
-        LoadActiveViewCommand = new RelayCommand(_ => LoadActiveView(), _ => !IsBusy);
+        // ViewHandler.GetActiveView needs Tekla 2024+; the command stays disabled on older builds.
+        LoadActiveViewCommand = new RelayCommand(_ => LoadActiveView(), _ => !IsBusy && ActiveViewSupported);
         LoadReferenceModelsCommand = new RelayCommand(_ => LoadReferenceModels(), _ => !IsBusy);
         LoadDrawingsCommand = new RelayCommand(_ => LoadDrawings(), _ => !IsBusy);
         LoadActiveDrawingCommand = new RelayCommand(_ => LoadActiveDrawing(), _ => !IsBusy);
@@ -260,25 +267,33 @@ public class MainViewModel : BaseViewModel
     /// </summary>
     private void LoadActiveView()
     {
+        if (GetActiveViewMethod is null)
+        {
+            // Unavailable below Tekla 2024; the command is also disabled (see CanExecute).
+            Status = "Active-view decomposition requires Tekla 2024 or newer.";
+            return;
+        }
         try
         {
             IsBusy = true;
             Objects.Clear();
             Trail.Clear();
-            var view = Tekla.Structures.Model.UI.ViewHandler.GetActiveView();
+            // Invoked by reflection: a 2021-compiled assembly can't reference GetActiveView directly.
+            var view = GetActiveViewMethod.Invoke(null, null);
             if (view is null)
             {
                 Status = "No active Tekla view.";
                 return;
             }
-            Trail.Add(new DecompositionFrame(view, $"Active view: {view.Name}"));
+            var name = view.GetType().GetProperty("Name")?.GetValue(view) as string ?? view.GetType().Name;
+            Trail.Add(new DecompositionFrame(view, $"Active view: {name}"));
             RenderCurrent();
             CaptureHistory();
-            Status = $"Decomposing active view '{view.Name}'.";
+            Status = $"Decomposing active view '{name}'.";
         }
         catch (Exception ex)
         {
-            Status = $"Failed to open active view: {ex.Message}";
+            Status = $"Failed to open active view: {ex.InnerException?.Message ?? ex.Message}";
         }
         finally
         {

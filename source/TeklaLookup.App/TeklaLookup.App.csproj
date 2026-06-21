@@ -13,14 +13,16 @@
         <Resource Include="Resources\AppIcon.ico" />
     </ItemGroup>
 
-    <!-- Tekla Open API (2026) -->
+    <!-- Tekla Open API — compile-only; version selected by TeklaOpenApiVersion (Directory.Build.props):
+         2021 floor in Release for forward-compat, locally-installed version in Debug. Members newer
+         than the floor are invoked by reflection at runtime (see Services/OptionalTeklaApi.cs). -->
     <ItemGroup>
-        <PackageReference Include="Tekla.Structures"           Version="2026.*" ExcludeAssets="runtime" />
-        <PackageReference Include="Tekla.Structures.Model"     Version="2026.*" ExcludeAssets="runtime" />
-        <PackageReference Include="Tekla.Structures.Drawing"   Version="2026.*" ExcludeAssets="runtime" />
-        <PackageReference Include="Tekla.Structures.Dialog"    Version="2026.*" ExcludeAssets="runtime" />
-        <PackageReference Include="Tekla.Structures.Catalogs"  Version="2026.*" ExcludeAssets="runtime" />
-        <PackageReference Include="Tekla.Structures.Datatype"  Version="2026.*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures"           Version="$(TeklaOpenApiVersion).*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Model"     Version="$(TeklaOpenApiVersion).*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Drawing"   Version="$(TeklaOpenApiVersion).*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Dialog"    Version="$(TeklaOpenApiVersion).*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Catalogs"  Version="$(TeklaOpenApiVersion).*" ExcludeAssets="runtime" />
+        <PackageReference Include="Tekla.Structures.Datatype"  Version="$(TeklaOpenApiVersion).*" ExcludeAssets="runtime" />
     </ItemGroup>
 
     <!-- Build tooling: patches the generated .exe.config so Tekla loads the app correctly -->
@@ -48,7 +50,10 @@
     <PropertyGroup>
         <TeklaBinDir>C:\TeklaStructures\$(TeklaVersion)\bin</TeklaBinDir>
     </PropertyGroup>
-    <Target Name="CopyTeklaSupportingDlls" AfterTargets="Build">
+    <!-- Debug-only (TeklaVersion is empty in Release). These satisfy Tekla's app.config binding
+         redirects when F5-debugging the standalone exe; in a Release/TSEP build the patcher is
+         skipped and the app resolves them from the GAC, so there's nothing to copy. -->
+    <Target Name="CopyTeklaSupportingDlls" AfterTargets="Build" Condition="'$(TeklaVersion)' != ''">
         <ItemGroup>
             <_TeklaSupportingDlls Include="$(TeklaBinDir)\System.Memory.dll" />
             <_TeklaSupportingDlls Include="$(TeklaBinDir)\System.Buffers.dll" />

@@ -17,12 +17,26 @@
         <!-- Use plain PackageReference Version attributes inside this subtree -->
         <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
 
-        <!--
-            Drives TSAppConfigPatcherTask: it writes <codeBase> entries into TeklaLookup.exe.config
-            pointing at the Tekla Structures GAC so Tekla.Structures.* assemblies resolve at runtime
-            without needing the .exe to live inside Tekla's bin folder.
-        -->
-        <TeklaVersion>2026.0</TeklaVersion>
+        <!-- TeklaOpenApiVersion selects the Tekla Open API NuGet package versions (compile-only;
+            see TeklaLookup.App.csproj, Version="$(TeklaOpenApiVersion).*"). Release compiles against
+            the oldest supported floor (2021) so one binary is forward-compatible across every later
+            Tekla in the GAC: a 2021-referenced assembly loads fine on 2021..2026+. NuGet restores
+            2021.* straight from the feed — nothing has to be installed. The handful of members added
+            after 2021 (ProfileItem.GetProfileItemSubTypes/GetHighAccuracyCrossSection,
+            ViewHandler.GetActiveView, Reinforcement.GetAssembly, TeklaStructuresInfo.GetPluginsFolder)
+            are invoked by reflection at RUNTIME (see Services/OptionalTeklaApi.cs), so the single
+            shipped binary lights those features up on whatever Tekla actually defines them and stays
+            functional on 2021. Debug compiles against the locally installed version. Bare year, no ".0". -->
+        <TeklaOpenApiVersion Condition="'$(Configuration)' == 'Release'">2021</TeklaOpenApiVersion>
+        <TeklaOpenApiVersion Condition="'$(TeklaOpenApiVersion)' == ''">2026</TeklaOpenApiVersion>
+
+        <!-- TeklaVersion is what TSAppConfigPatcherTask reads to patch the exe.config <codeBase> at
+            the locally installed Tekla for F5 debugging (the ".0" form matches the install/registry,
+            e.g. 2026.0). It is set ONLY in Debug; in Release it stays EMPTY so the patcher is skipped
+            and the packaged exe.config carries no machine-specific path. NB: the patcher reads the
+            Windows REGISTRY for an installed Tekla — it has NO NuGet path — so a non-empty value here
+            in Release would demand that exact version be installed and bake a non-portable codeBase. -->
+        <TeklaVersion Condition="'$(Configuration)' == 'Debug'">$(TeklaOpenApiVersion).0</TeklaVersion>
     </PropertyGroup>
 
 </Project>

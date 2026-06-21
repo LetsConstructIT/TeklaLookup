@@ -1,3 +1,4 @@
+using TeklaLookup.App.Services;
 using TSInfo = Tekla.Structures.TeklaStructuresInfo;
 
 namespace TeklaLookup.App.Models;
@@ -14,7 +15,9 @@ public sealed class TeklaStructuresInfoSnapshot
         BuildNumber           = Try(() => TSInfo.GetBuildNumber());
         RevisionDate          = Try(() => TSInfo.GetRevisionDate());
         CurrentUser           = Try(() => TSInfo.GetCurrentUser());
-        PluginsFolder         = Try(() => TSInfo.GetPluginsFolder());
+        // GetPluginsFolder was added in Tekla 2022; resolve it at runtime so the 2021-floor build
+        // still surfaces it when running on a newer Tekla, and reads as a clear note on 2021.
+        PluginsFolder         = TryStatic(typeof(TSInfo), "GetPluginsFolder", "2022");
         LocalAppDataFolder    = Try(() => TSInfo.GetLocalAppDataFolder());
         CommonAppDataFolder   = Try(() => TSInfo.GetCommonAppDataFolder());
         FullTSRegistryKeyText = Try(() => TSInfo.GetFullTSRegistryKeyText());
@@ -35,5 +38,15 @@ public sealed class TeklaStructuresInfoSnapshot
     {
         try { return producer() ?? string.Empty; }
         catch (System.Exception ex) { return $"<error: {ex.Message}>"; }
+    }
+
+    // Invokes a public static parameterless string-returning helper by reflection. If this Tekla
+    // version doesn't define it (the member was added in <paramref name="sinceVersion"/>), returns a
+    // note saying so rather than a blank that looks like an empty result.
+    private static string TryStatic(System.Type type, string method, string sinceVersion)
+    {
+        var m = OptionalTeklaApi.Method(type, method);
+        if (m is null) return $"<requires Tekla {sinceVersion} or newer>";
+        return Try(() => m.Invoke(null, null) as string ?? string.Empty);
     }
 }
