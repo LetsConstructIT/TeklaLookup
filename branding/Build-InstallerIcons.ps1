@@ -23,8 +23,8 @@ Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
 
 # --- Design (256-px space) — kept identical to Build-AppIcon.ps1 ----------------
 $LensCenter = @(150, 116); $LensRadius = 56
-$Ibeam = @(104,41, 196,41, 196,67, 165,67, 165,165, 196,165, 196,191,
-           104,191, 104,165, 135,165, 135,67, 104,67)
+$Ibeam = @(104,16, 196,16, 196,44, 166,44, 166,188, 196,188, 196,216,
+           104,216, 104,188, 134,188, 134,44, 104,44)
 $GrayFill = 'B6C2D1'
 
 function Color([string]$hex) {
@@ -48,14 +48,17 @@ function New-Polygon([double[]]$pts, $brush) {
     $d = New-Object System.Windows.Media.GeometryDrawing; $d.Geometry = $geo; $d.Brush = $brush; $d
 }
 
-function New-BlueBrush {
-    # Vertical brand gradient #3B82F6 -> #1D4FD7.
+function New-Gradient([string]$top, [string]$bottom) {
     $g = New-Object System.Windows.Media.LinearGradientBrush
     $g.StartPoint = Point 0 0; $g.EndPoint = Point 0 1
-    $g.GradientStops.Add((New-Object System.Windows.Media.GradientStop ((Color '3B82F6'), 0.0)))
-    $g.GradientStops.Add((New-Object System.Windows.Media.GradientStop ((Color '1D4FD7'), 1.0)))
+    $g.GradientStops.Add((New-Object System.Windows.Media.GradientStop ((Color $top), 0.0)))
+    $g.GradientStops.Add((New-Object System.Windows.Media.GradientStop ((Color $bottom), 1.0)))
     $g
 }
+# Blue brand gradient for the magnifier; amber->orange accent for the beam slice
+# under the glass, so the "lookup hit" reads distinct from the lens.
+function New-BlueBrush   { New-Gradient '3B82F6' '1D4FD7' }
+function New-AccentBrush { New-Gradient 'FBBF24' 'F97316' }
 
 function New-LogoDrawing {
     $root = New-Object System.Windows.Media.DrawingGroup
@@ -63,17 +66,17 @@ function New-LogoDrawing {
     # Gray I-beam.
     $root.Children.Add((New-Polygon $Ibeam (Brush $GrayFill)))
 
-    # Same beam in blue, clipped to the lens circle (the lookup hit).
-    $blueGroup = New-Object System.Windows.Media.DrawingGroup
-    $blueGroup.ClipGeometry = New-Object System.Windows.Media.EllipseGeometry ((Point $LensCenter[0] $LensCenter[1]), $LensRadius, $LensRadius)
-    $blueGroup.Children.Add((New-Polygon $Ibeam (New-BlueBrush)))
-    $root.Children.Add($blueGroup)
+    # The beam slice under the glass, in the amber accent (the lookup hit).
+    $hitGroup = New-Object System.Windows.Media.DrawingGroup
+    $hitGroup.ClipGeometry = New-Object System.Windows.Media.EllipseGeometry ((Point $LensCenter[0] $LensCenter[1]), $LensRadius, $LensRadius)
+    $hitGroup.Children.Add((New-Polygon $Ibeam (New-AccentBrush)))
+    $root.Children.Add($hitGroup)
 
     $ring = New-BlueBrush
 
     # Magnifier handle (under the ring).
     $handle = New-Object System.Windows.Media.GeometryDrawing
-    $handle.Geometry = New-Object System.Windows.Media.LineGeometry ((Point 190 156), (Point 232 206))
+    $handle.Geometry = New-Object System.Windows.Media.LineGeometry ((Point 193 163), (Point 232 206))
     $hp = New-Object System.Windows.Media.Pen ($ring, 24); $hp.StartLineCap = 'Round'; $hp.EndLineCap = 'Round'
     $handle.Pen = $hp; $root.Children.Add($handle)
 

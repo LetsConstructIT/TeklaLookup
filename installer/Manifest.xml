@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TEP Version="2.0">
+
+    <!-- Tekla Lookup — interactive runtime inspector for Tekla Structures models
+         and drawings. Distributed as a standalone WPF application (TeklaLookup.exe)
+         plus a launcher macro. The .exe is deployed to the environment's extensions
+         folder; the macro is deployed to macros\modeling so "Tekla Lookup" appears
+         in Applications & components and starts the app (which connects to the open
+         model over the Tekla Open API). -->
+    <Product Id="TeklaLookup"
+             UpgradeCode="d2ab94ad-6426-4ce2-b60b-2fe3d3ce326c"
+             Version="1.0"
+             Language="1033"
+             Name="Tekla Lookup"
+             Manufacturer="Greg Olszewski"
+             Description="Interactive runtime inspector for Tekla Structures. Drill into any model object, drawing object, catalog item, or property tree — properties, UDAs, report properties, geometry, reference-model contents, and live events. Read-only, runs entirely on your machine."
+             IconPath="%TEPDEFINITIONFILEFOLDER%\TeklaLookup.png"
+             Type="Extension">
+        <!-- Built against the 2021 Open API floor; APIs newer than 2021 are compiled out (see the
+             TEKLA*_OR_NEWER guards), so 2021.0 is the real minimum, forward-compatible up to 2099.1
+             via the GAC. -->
+        <TeklaVersions>
+            <TeklaVersion Name="2021.0"/>
+            <MinTeklaVersion Name="2021.0"/>
+            <MaxTeklaVersion Name="2099.1"/>
+        </TeklaVersions>
+    </Product>
+
+    <!-- Sources: app closure dropped by build-tsep.ps1, and the launcher macro. -->
+    <SourcePathVariables>
+        <SourcePathVariable Id="SourceBinaries" Value="%TEPDEFINITIONFILEFOLDER%\BuildDrop"/>
+        <SourcePathVariable Id="SourceMacro"    Value="%TEPDEFINITIONFILEFOLDER%\Macro"/>
+    </SourcePathVariables>
+
+    <!-- Install targets: app -> <env>\extensions\TeklaLookup\,
+         macro -> <env>\macros\modeling\. -->
+    <TargetPathVariables>
+        <PathVariable Id="ExtensionName"     Value="TeklaLookup"/>
+        <PathVariable Id="ExtensionsRootDir" Value="%commonEnvFolder%\extensions"/>
+        <PathVariable Id="TargetBinaries"    Value="%ExtensionsRootDir%\%ExtensionName%"/>
+        <PathVariable Id="TargetMacroModel"  Value="%commonEnvFolder%\macros\modeling"/>
+    </TargetPathVariables>
+
+    <Component Id="MainComponent" Guid="e362edcc-ddd0-4c80-8efd-bef30d7f12f4">
+        <File Id="CopyBinaries"   Source="%SourceBinaries%\*.*" Target="%TargetBinaries%"   Recursive="yes" />
+        <File Id="CopyModelMacro" Source="%SourceMacro%\*.*"    Target="%TargetMacroModel%" Recursive="no"  />
+    </Component>
+
+    <Feature Id="MainFeature" Title="Tekla Lookup">
+        <ComponentRef ReferenceId="MainComponent" />
+    </Feature>
+
+</TEP>

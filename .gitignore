@@ -12,3 +12,9 @@
 
 #User-specific files
 *.user
+
+#TSEP installer (generated build artifacts)
+installer/BuildDrop/
+dist/
+*.tsep
+*.tsep.log
