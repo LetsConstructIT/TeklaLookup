@@ -59,7 +59,7 @@ public sealed class ObjectDecomposer
 
     private void AddExtensions(object target, List<PropertyEntry> entries)
     {
-        foreach (var entry in _extensions.Resolve(target))
+        foreach (var entry in _extensions.Resolve(target).OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
             entries.Add(entry);
     }
 
@@ -180,7 +180,8 @@ public sealed class ObjectDecomposer
             return;
         }
 
-        foreach (DictionaryEntry kvp in hashtable)
+        foreach (DictionaryEntry kvp in hashtable.Cast<DictionaryEntry>()
+            .OrderBy(e => e.Key?.ToString() ?? string.Empty, StringComparer.OrdinalIgnoreCase))
         {
             entries.Add(new PropertyEntry
             {
@@ -195,7 +196,7 @@ public sealed class ObjectDecomposer
 
     private static void AddReportProperties(ModelObject modelObject, List<PropertyEntry> entries)
     {
-        foreach (var name in CommonReportProperties)
+        foreach (var name in CommonReportProperties.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
         {
             if (TryReadReportString(modelObject, name, out var s))
             {
