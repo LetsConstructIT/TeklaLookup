@@ -425,6 +425,13 @@
                                Foreground="White"
                                FontSize="14"
                                HorizontalAlignment="Center" />
+                    <ui:Button Content="Cancel"
+                               Icon="{ui:SymbolIcon DismissCircle24}"
+                               Command="{Binding CancelCommand}"
+                               Margin="0,16,0,0"
+                               Padding="16,4"
+                               HorizontalAlignment="Center"
+                               ToolTip="Stop the running enumeration (keeps results gathered so far)" />
                 </StackPanel>
             </Border>
         </Grid>

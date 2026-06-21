@@ -19,9 +19,10 @@ public class MainViewModel : BaseViewModel
     private readonly GeometryVisualizer _visualizer = new();
     private readonly JsonObjectDumper _jsonDumper = new();
 
-    private string _title = "TeklaLookup";
+    private string _title = "Tekla Lookup";
     private string _status = "Ready.";
     private bool _isBusy;
+    private bool _isCancellationRequested;
     private bool _isTopmost = SettingsStore.Current.IsTopmost;
     private TeklaObjectSnapshot? _selectedObject;
     private string? _currentTargetTitle;
@@ -83,6 +84,7 @@ public class MainViewModel : BaseViewModel
             p => HasShowableTarget(p as PropertyEntry));
         ApplyThemeCommand = new RelayCommand(p => ApplyTheme(p as string));
         OpenEventMonitorCommand = new RelayCommand(_ => OpenEventMonitor());
+        CancelCommand = new RelayCommand(_ => RequestCancel(), _ => IsBusy && !IsCancellationRequested);
 
         PropertiesView = CollectionViewSource.GetDefaultView(Properties);
         PropertiesView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PropertyEntry.Category)));
@@ -106,7 +108,35 @@ public class MainViewModel : BaseViewModel
     public bool IsBusy
     {
         get => _isBusy;
-        private set => SetProperty(ref _isBusy, value);
+        private set
+        {
+            // Each fresh operation starts uncancelled — a leftover request from a previous
+            // (cancelled) run must not abort the next one before it begins.
+            if (SetProperty(ref _isBusy, value) && value)
+                IsCancellationRequested = false;
+        }
+    }
+
+    /// <summary>
+    /// True once the user has asked to cancel the current enumeration. Long-running loops check
+    /// this at each progress tick (right after pumping the dispatcher, which is when the Cancel
+    /// click is actually processed) and stop early, keeping whatever they collected so far.
+    /// </summary>
+    public bool IsCancellationRequested
+    {
+        get => _isCancellationRequested;
+        private set
+        {
+            if (SetProperty(ref _isCancellationRequested, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    private void RequestCancel()
+    {
+        if (!IsBusy || IsCancellationRequested) return;
+        IsCancellationRequested = true;
+        Status = "Cancelling…";
     }
 
     public bool IsTopmost
@@ -215,6 +245,7 @@ public class MainViewModel : BaseViewModel
     public ICommand SelectPropertyInTeklaCommand { get; }
     public ICommand ApplyThemeCommand { get; }
     public ICommand OpenEventMonitorCommand { get; }
+    public ICommand CancelCommand { get; }
 
     private void LoadSelected()
     {
@@ -437,6 +468,7 @@ public class MainViewModel : BaseViewModel
             PumpDispatcher();
 
             var buffer = new List<TeklaObjectSnapshot>();
+            var cancelled = false;
             foreach (var snapshot in producer())
             {
                 buffer.Add(snapshot);
@@ -444,18 +476,23 @@ public class MainViewModel : BaseViewModel
                 {
                     Status = $"Loading {label}… {buffer.Count} so far";
                     PumpDispatcher();
+                    // The Cancel click is only delivered during the pump above — check right after.
+                    if (IsCancellationRequested) { cancelled = true; break; }
                 }
             }
 
             Status = buffer.Count == 0
-                ? $"No {label} found."
+                ? (cancelled ? $"Cancelled — no {label} loaded." : $"No {label} found.")
                 : $"Populating grid with {buffer.Count} {label}…";
             PumpDispatcher();
 
+            // Show whatever we collected before the user cancelled — partial results are still useful.
             foreach (var snapshot in buffer)
                 Objects.Add(snapshot);
 
-            Status = $"Loaded {Objects.Count} {label}.";
+            Status = cancelled
+                ? $"Cancelled — loaded {Objects.Count} {label} before stopping."
+                : $"Loaded {Objects.Count} {label}.";
 
             // With a single result there's nothing to choose between — surface its details
             // immediately instead of making the user click the lone row.
@@ -824,6 +861,12 @@ public class MainViewModel : BaseViewModel
                     {
                         Status = $"Drilling into {entry.Name}… {items.Count} items so far";
                         PumpDispatcher();
+                        // A half-materialized list would be a misleading frame — abort the drill entirely.
+                        if (IsCancellationRequested)
+                        {
+                            Status = $"Cancelled drilling into {entry.Name}.";
+                            return;
+                        }
                     }
                 }
                 target = items;
@@ -1046,6 +1089,11 @@ public class MainViewModel : BaseViewModel
                     {
                         Status = $"Decomposing {frame.Title}… {rendered} properties so far";
                         PumpDispatcher();
+                        if (IsCancellationRequested)
+                        {
+                            Status = $"Cancelled — showing first {rendered} properties of {frame.Title}.";
+                            break;
+                        }
                     }
                 }
             }
