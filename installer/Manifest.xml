@@ -4,9 +4,10 @@
     <!-- Tekla Lookup — interactive runtime inspector for Tekla Structures models
          and drawings. Distributed as a standalone WPF application (TeklaLookup.exe)
          plus a launcher macro. The .exe is deployed to the environment's extensions
-         folder; the macro is deployed to macros\modeling so "Tekla Lookup" appears
-         in Applications & components and starts the app (which connects to the open
-         model over the Tekla Open API). -->
+         folder; the same launcher macro is deployed to both macros\modeling and
+         macros\drawings so "Tekla Lookup" appears in Applications & components in
+         both the model editor and the drawing editor, and starts the app (which
+         connects to the open model/drawing over the Tekla Open API). -->
     <Product Id="TeklaLookup"
              UpgradeCode="d2ab94ad-6426-4ce2-b60b-2fe3d3ce326c"
              Version="1.0"
@@ -33,17 +34,20 @@
     </SourcePathVariables>
 
     <!-- Install targets: app -> <env>\extensions\TeklaLookup\,
-         macro -> <env>\macros\modeling\. -->
+         macro -> <env>\macros\modeling\ AND <env>\macros\drawings\ (same launcher,
+         so the tool is reachable from both the model and drawing editors). -->
     <TargetPathVariables>
-        <PathVariable Id="ExtensionName"     Value="TeklaLookup"/>
-        <PathVariable Id="ExtensionsRootDir" Value="%commonEnvFolder%\extensions"/>
-        <PathVariable Id="TargetBinaries"    Value="%ExtensionsRootDir%\%ExtensionName%"/>
-        <PathVariable Id="TargetMacroModel"  Value="%commonEnvFolder%\macros\modeling"/>
+        <PathVariable Id="ExtensionName"      Value="TeklaLookup"/>
+        <PathVariable Id="ExtensionsRootDir"  Value="%commonEnvFolder%\extensions"/>
+        <PathVariable Id="TargetBinaries"     Value="%ExtensionsRootDir%\%ExtensionName%"/>
+        <PathVariable Id="TargetMacroModel"   Value="%commonEnvFolder%\macros\modeling"/>
+        <PathVariable Id="TargetMacroDrawing" Value="%commonEnvFolder%\macros\drawings"/>
     </TargetPathVariables>
 
     <Component Id="MainComponent" Guid="e362edcc-ddd0-4c80-8efd-bef30d7f12f4">
-        <File Id="CopyBinaries"   Source="%SourceBinaries%\*.*" Target="%TargetBinaries%"   Recursive="yes" />
-        <File Id="CopyModelMacro" Source="%SourceMacro%\*.*"    Target="%TargetMacroModel%" Recursive="no"  />
+        <File Id="CopyBinaries"     Source="%SourceBinaries%\*.*" Target="%TargetBinaries%"     Recursive="yes" />
+        <File Id="CopyModelMacro"   Source="%SourceMacro%\*.*"    Target="%TargetMacroModel%"   Recursive="no"  />
+        <File Id="CopyDrawingMacro" Source="%SourceMacro%\*.*"    Target="%TargetMacroDrawing%" Recursive="no"  />
     </Component>
 
     <Feature Id="MainFeature" Title="Tekla Lookup">

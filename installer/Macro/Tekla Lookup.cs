@@ -1,10 +1,12 @@
 // Tekla Lookup — launcher macro.
 //
-// Installed to <env>\macros\modeling\ by the TSEP (see installer\Manifest.xml),
-// this is what makes "Tekla Lookup" appear in Tekla's Applications & components
-// catalog. Running it starts the standalone TeklaLookup.exe (shipped in
-// <env>\extensions\TeklaLookup\), which connects to the open model over the
-// Tekla Open API and shows the WPF inspector UI.
+// Installed to BOTH <env>\macros\modeling\ and <env>\macros\drawings\ by the
+// TSEP (see installer\Manifest.xml), this is what makes "Tekla Lookup" appear in
+// Tekla's Applications & components catalog in both the model editor and the
+// drawing editor. Running it starts the standalone TeklaLookup.exe (shipped in
+// <env>\extensions\TeklaLookup\), which connects to the open model/drawing over
+// the Tekla Open API and shows the WPF inspector UI. The launcher is identical
+// in both contexts, so one source file serves both targets.
 //
 // The catalog thumbnail is "Tekla Lookup.png" (96x96) next to this file: Tekla
 // pairs a macro with a same-named PNG in the macros folder automatically.
