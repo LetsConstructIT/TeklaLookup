@@ -39,7 +39,7 @@ public abstract class TeklaTypeExtension<T> : ITeklaTypeExtension where T : clas
 
             return new PropertyEntry
             {
-                Category = "Extensions",
+                Category = PropertyCategories.Extensions,
                 Name = name,
                 Value = ValueFormatting.Format(raw),
                 ValueType = displayType,
@@ -50,7 +50,7 @@ public abstract class TeklaTypeExtension<T> : ITeklaTypeExtension where T : clas
         {
             return new PropertyEntry
             {
-                Category = "Extensions",
+                Category = PropertyCategories.Extensions,
                 Name = name,
                 Value = $"<error: {ex.InnerException?.Message ?? ex.Message}>",
                 ValueType = typeHint,

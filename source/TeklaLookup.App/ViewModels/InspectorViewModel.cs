@@ -8,6 +8,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using TeklaLookup.App.Models;
 using TeklaLookup.App.Services;
+using TeklaLookup.App.Services.TemplateAttributes;
 
 namespace TeklaLookup.App.ViewModels;
 
@@ -24,6 +25,9 @@ public sealed class InspectorViewModel : BaseViewModel
     private readonly GeometryVisualizer _visualizer;
     private readonly ObjectDecomposer _decomposer;
     private readonly JsonObjectDumper _jsonDumper = new();
+
+    private readonly DecompositionOptions _options =
+        new() { TemplateAttributes = TemplateAttributeScopePreference.Load() };
 
     private string _title;
     private string _status = "Ready.";
@@ -63,6 +67,8 @@ public sealed class InspectorViewModel : BaseViewModel
         SelectPropertyInTeklaCommand = new RelayCommand(
             p => SelectPropertyInTekla(p as PropertyEntry),
             p => HasShowableTarget(p as PropertyEntry));
+        TogglePinCommand = new RelayCommand(p => TogglePin(p as PropertyEntry),
+            p => (p as PropertyEntry)?.CanPin == true);
 
         PropertiesView = CollectionViewSource.GetDefaultView(Properties);
         PropertiesView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PropertyEntry.Category)));
@@ -91,6 +97,29 @@ public sealed class InspectorViewModel : BaseViewModel
 
     public bool CanGoBack => Trail.Count > 1;
 
+    public IReadOnlyList<TemplateAttributeScopeOption> TemplateAttributeScopes
+        => TemplateAttributeScopeOption.All;
+
+    /// <summary>
+    /// How much of the template attribute list to read. Remembered across launches by
+    /// <see cref="TemplateAttributeScopePreference"/>, except for the Full tier, which is restored
+    /// as Associated because its cost would make the next session's first load look like a hang.
+    /// Switching to Full is how you find a related-object attribute worth pinning; the pin then
+    /// survives switching back, because pinned attributes are read in Associated too.
+    /// </summary>
+    public TemplateAttributeScope TemplateAttributeScope
+    {
+        get => _options.TemplateAttributes;
+        set
+        {
+            if (_options.TemplateAttributes == value) return;
+            _options.TemplateAttributes = value;
+            TemplateAttributeScopePreference.Save(value);
+            OnPropertyChanged();
+            RenderCurrent();
+        }
+    }
+
     public ObservableCollection<DecompositionFrame> Trail { get; } = new();
     public ObservableCollection<PropertyEntry> Properties { get; } = new();
     public ICollectionView PropertiesView { get; }
@@ -106,6 +135,23 @@ public sealed class InspectorViewModel : BaseViewModel
     public ICommand CopyPropertyLineCommand { get; }
     public ICommand HighlightCommand { get; }
     public ICommand SelectPropertyInTeklaCommand { get; }
+    public ICommand TogglePinCommand { get; }
+
+    /// <summary>
+    /// Stars or unstars an attribute for its content type, then re-renders so the row moves into
+    /// or out of the "Pinned" group. Re-decomposing is a batched read, and doing it this way keeps
+    /// group ordering owned by <see cref="ObjectDecomposer"/> rather than by view-level live shaping.
+    /// </summary>
+    private void TogglePin(PropertyEntry? entry)
+    {
+        if (entry is null || !entry.CanPin) return;
+
+        var pinned = PinnedAttributeStore.Toggle(entry.PinScope, entry.Name);
+        RenderCurrent();
+        Status = pinned
+            ? $"Pinned {entry.Name} for {entry.PinScope}."
+            : $"Unpinned {entry.Name} for {entry.PinScope}.";
+    }
 
     private void DrillInto(PropertyEntry? entry)
     {
@@ -210,7 +256,7 @@ public sealed class InspectorViewModel : BaseViewModel
             CurrentTargetTitle = frame.Title;
             try
             {
-                foreach (var entry in _decomposer.Decompose(frame.Target))
+                foreach (var entry in _decomposer.Decompose(frame.Target, _options))
                     Properties.Add(entry);
             }
             catch (Exception ex)

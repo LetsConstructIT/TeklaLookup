@@ -12,6 +12,39 @@
             </ResourceDictionary.MergedDictionaries>
             <svc:PropertyEntryToIconConverter x:Key="PropertyIcon" />
             <svc:SnapshotTypeToIconConverter x:Key="SnapshotIcon" />
+            <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+            <!--
+                Star toggle in the properties grid. Templated down to bare content so the Fluent
+                button chrome doesn't box in a 16px glyph, and hidden entirely on rows that can't
+                be pinned (list elements, error rows) so the column reads as empty there.
+            -->
+            <Style x:Key="PinButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Foreground" Value="#B0B4BA" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="Transparent">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                        <Setter Property="Foreground" Value="#E8A33D" />
+                    </DataTrigger>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Foreground" Value="#E8A33D" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

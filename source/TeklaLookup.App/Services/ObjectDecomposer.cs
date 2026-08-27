@@ -6,18 +6,21 @@ using System.Reflection;
 using Tekla.Structures.Model;
 using TeklaLookup.App.Models;
 using TeklaLookup.App.Services.Extensions;
+using TeklaLookup.App.Services.TemplateAttributes;
 using TSD = Tekla.Structures.Drawing;
 
 namespace TeklaLookup.App.Services;
 
 /// <summary>
 /// Produces a flat, displayable list of properties for any CLR object. For <see cref="ModelObject"/>
-/// targets it also pulls UDAs and a handful of common report properties; drawing-side objects
-/// (drawings, views, marks, dimensions…) contribute their UDAs through the drawing API instead.
+/// targets it also pulls UDAs and the template attributes the environment declares for that content
+/// type; drawing-side objects (drawings, views, marks, dimensions…) contribute their UDAs through
+/// the drawing API instead.
 /// </summary>
 public sealed class ObjectDecomposer
 {
     private readonly TeklaExtensionRegistry _extensions;
+    private readonly TemplateAttributeReader _templateAttributes = new();
 
     public ObjectDecomposer() : this(new TeklaExtensionRegistry()) { }
 
@@ -26,14 +29,10 @@ public sealed class ObjectDecomposer
         _extensions = extensions;
     }
 
-    private static readonly string[] CommonReportProperties =
-    {
-        "NAME", "PROFILE", "MATERIAL", "CLASS", "PHASE",
-        "LENGTH", "AREA", "WEIGHT", "VOLUME",
-        "PART_POS", "ASSEMBLY_POS",
-    };
-
     public IReadOnlyList<PropertyEntry> Decompose(object target)
+        => Decompose(target, DecompositionOptions.Default);
+
+    public IReadOnlyList<PropertyEntry> Decompose(object target, DecompositionOptions options)
     {
         var entries = new List<PropertyEntry>();
 
@@ -51,7 +50,7 @@ public sealed class ObjectDecomposer
                 if (target is ModelObject modelObject)
                 {
                     AddUserProperties(modelObject, entries);
-                    AddReportProperties(modelObject, entries);
+                    AddTemplateAttributes(modelObject, entries, options);
                 }
                 else if (target is TSD.DatabaseObject drawingObject)
                 {
@@ -62,7 +61,33 @@ public sealed class ObjectDecomposer
                 break;
         }
 
-        return entries;
+        return ApplyPins(target, entries);
+    }
+
+    /// <summary>
+    /// Tags every row with the scope its pin would be stored under, marks the ones the user has
+    /// already pinned, and floats those to the front so the "Pinned" group renders first.
+    /// </summary>
+    private static IReadOnlyList<PropertyEntry> ApplyPins(object target, List<PropertyEntry> entries)
+    {
+        var scope = TeklaContentTypes.ScopeFor(target);
+        if (scope.Length == 0) return entries;
+
+        var anyPinned = false;
+        foreach (var entry in entries)
+        {
+            entry.PinScope = scope;
+            if (!entry.CanPin || !PinnedAttributeStore.IsPinned(scope, entry.Name)) continue;
+            entry.IsPinned = true;
+            anyPinned = true;
+        }
+
+        if (!anyPinned) return entries;
+
+        var ordered = new List<PropertyEntry>(entries.Count);
+        foreach (var entry in entries) if (entry.IsPinned) ordered.Add(entry);
+        foreach (var entry in entries) if (!entry.IsPinned) ordered.Add(entry);
+        return ordered;
     }
 
     private void AddExtensions(object target, List<PropertyEntry> entries)
@@ -77,7 +102,7 @@ public sealed class ObjectDecomposer
         {
             entries.Add(new PropertyEntry
             {
-                Category = "Items",
+                Category = PropertyCategories.Items,
                 Name = kvp.Key?.ToString() ?? "<null>",
                 Value = FormatValue(kvp.Value),
                 ValueType = kvp.Value?.GetType().Name,
@@ -93,7 +118,7 @@ public sealed class ObjectDecomposer
         {
             entries.Add(new PropertyEntry
             {
-                Category = "Items",
+                Category = PropertyCategories.Items,
                 Name = $"[{index}]",
                 Value = FormatValue(item),
                 ValueType = item?.GetType().Name,
@@ -147,7 +172,7 @@ public sealed class ObjectDecomposer
 
             entries.Add(new PropertyEntry
             {
-                Category = "Properties",
+                Category = PropertyCategories.Properties,
                 Name = member.Name,
                 Value = value,
                 ValueType = typeName,
@@ -181,7 +206,7 @@ public sealed class ObjectDecomposer
         {
             entries.Add(new PropertyEntry
             {
-                Category = "User Properties",
+                Category = PropertyCategories.UserProperties,
                 Name = "<error>",
                 Value = ex.Message,
             });
@@ -193,7 +218,7 @@ public sealed class ObjectDecomposer
         {
             entries.Add(new PropertyEntry
             {
-                Category = "User Properties",
+                Category = PropertyCategories.UserProperties,
                 Name = kvp.Key?.ToString() ?? string.Empty,
                 Value = FormatValue(kvp.Value),
                 ValueType = kvp.Value?.GetType().Name,
@@ -202,46 +227,26 @@ public sealed class ObjectDecomposer
         }
     }
 
-    private static void AddReportProperties(ModelObject modelObject, List<PropertyEntry> entries)
+    /// <summary>
+    /// Template (report) attributes, driven by the environment's own <c>contentattributes*.lst</c>
+    /// rather than a fixed name list — see <see cref="TemplateAttributeReader"/>.
+    /// </summary>
+    private void AddTemplateAttributes(
+        ModelObject modelObject,
+        List<PropertyEntry> entries,
+        DecompositionOptions options)
     {
-        foreach (var name in CommonReportProperties.OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
+        var scope = TeklaContentTypes.ScopeFor(modelObject);
+        var pinned = PinnedAttributeStore.ForScope(scope);
+
+        foreach (var entry in _templateAttributes.Read(
+                     modelObject,
+                     options.TemplateAttributes,
+                     pinned,
+                     options.MaxTemplateAttributes))
         {
-            if (TryReadReportString(modelObject, name, out var s))
-            {
-                entries.Add(new PropertyEntry { Category = "Report", Name = name, Value = s, ValueType = nameof(String), RawValue = s });
-                continue;
-            }
-            if (TryReadReportDouble(modelObject, name, out var d))
-            {
-                entries.Add(new PropertyEntry { Category = "Report", Name = name, Value = d.ToString("R"), ValueType = nameof(Double), RawValue = d });
-                continue;
-            }
-            if (TryReadReportInt(modelObject, name, out var i))
-            {
-                entries.Add(new PropertyEntry { Category = "Report", Name = name, Value = i.ToString(), ValueType = nameof(Int32), RawValue = i });
-            }
+            entries.Add(entry);
         }
-    }
-
-    private static bool TryReadReportString(ModelObject mo, string name, out string value)
-    {
-        value = string.Empty;
-        try { return mo.GetReportProperty(name, ref value); }
-        catch { return false; }
-    }
-
-    private static bool TryReadReportDouble(ModelObject mo, string name, out double value)
-    {
-        value = 0;
-        try { return mo.GetReportProperty(name, ref value); }
-        catch { return false; }
-    }
-
-    private static bool TryReadReportInt(ModelObject mo, string name, out int value)
-    {
-        value = 0;
-        try { return mo.GetReportProperty(name, ref value); }
-        catch { return false; }
     }
 
     /// <summary>
@@ -268,7 +273,7 @@ public sealed class ObjectDecomposer
         {
             entries.Add(new PropertyEntry
             {
-                Category = "User Properties",
+                Category = PropertyCategories.UserProperties,
                 Name = "<error>",
                 Value = failure,
             });
@@ -299,7 +304,7 @@ public sealed class ObjectDecomposer
         {
             collected.Add(new PropertyEntry
             {
-                Category = "User Properties",
+                Category = PropertyCategories.UserProperties,
                 Name = kvp.Key,
                 Value = FormatValue(kvp.Value),
                 ValueType = typeof(T).Name,

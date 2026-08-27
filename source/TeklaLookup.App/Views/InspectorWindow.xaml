@@ -52,6 +52,18 @@
                                Icon="{ui:SymbolIcon ArrowSync24}"
                                Padding="8,2"
                                ToolTip="Re-decompose current object (F5)" />
+                    <ComboBox ItemsSource="{Binding TemplateAttributeScopes}"
+                              SelectedValue="{Binding TemplateAttributeScope}"
+                              SelectedValuePath="Scope"
+                              DisplayMemberPath="Label"
+                              VerticalAlignment="Center" Margin="8,0,0,0" MinWidth="170"
+                              ToolTip="How much of the environment's template attribute list to read. Pinned attributes are always read and always shown first, in every mode.">
+                                  <ComboBox.ItemContainerStyle>
+                                      <Style TargetType="ComboBoxItem">
+                                          <Setter Property="ToolTip" Value="{Binding Description}" />
+                                      </Style>
+                                  </ComboBox.ItemContainerStyle>
+                              </ComboBox>
                 </StackPanel>
                 <ItemsControl Grid.Column="1"
                               ItemsSource="{Binding Trail}"
@@ -100,6 +112,11 @@
                         <Setter Property="TextWrapping" Value="Wrap" />
                         <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
                     </Style>
+                    <!-- Name column: prefers the attribute's declared label over the raw name in the tooltip. -->
+                    <Style x:Key="NameCell" TargetType="TextBlock">
+                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                        <Setter Property="ToolTip" Value="{Binding NameTooltip}" />
+                    </Style>
                     <Style x:Key="EllipsisCell" TargetType="TextBlock">
                         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
                         <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}" />
@@ -123,6 +140,10 @@
                                               CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                     <MenuItem Header="Show in Tekla"
                                               Command="{Binding PlacementTarget.Tag.SelectPropertyInTeklaCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                    <Separator />
+                                    <MenuItem Header="Pin / unpin for this object type"
+                                              Command="{Binding PlacementTarget.Tag.TogglePinCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                               CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                     <Separator />
                                     <MenuItem Header="Save object as JSON (for LLM)…"
@@ -181,6 +202,19 @@
                     </GroupStyle>
                 </DataGrid.GroupStyle>
                 <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="" Width="26" CanUserResize="False" CanUserReorder="False" CanUserSort="False">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource PinButtonStyle}"
+                                        Command="{Binding DataContext.TogglePinCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}"
+                                        Visibility="{Binding CanPin, Converter={StaticResource BoolToVisibility}}"
+                                        ToolTip="Pin this attribute so it stays at the top for every object of this type">
+                                    <ui:SymbolIcon Symbol="Star20" Filled="{Binding IsPinned}" />
+                                </Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="" Width="28" CanUserResize="False" CanUserReorder="False" CanUserSort="False">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -192,7 +226,7 @@
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Name"  Binding="{Binding Name}"
                                         Width="2*" MinWidth="120"
-                                        ElementStyle="{StaticResource EllipsisCell}" />
+                                        ElementStyle="{StaticResource NameCell}" />
                     <DataGridTextColumn Header="Value" Binding="{Binding Value}"
                                         Width="5*" MinWidth="200"
                                         ElementStyle="{StaticResource WrappedCell}" />

@@ -15,6 +15,7 @@ public sealed class UserSettings
     [DataMember(EmitDefaultValue = false)] public double? WindowWidth { get; set; }
     [DataMember(EmitDefaultValue = false)] public double? WindowHeight { get; set; }
     [DataMember(EmitDefaultValue = false)] public bool IsMaximized { get; set; }
+    [DataMember(EmitDefaultValue = false)] public string? TemplateAttributeScope { get; set; }
 }
 
 /// <summary>

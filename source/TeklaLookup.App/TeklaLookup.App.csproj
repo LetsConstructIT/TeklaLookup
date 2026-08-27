@@ -13,6 +13,14 @@
         <Resource Include="Resources\AppIcon.ico" />
     </ItemGroup>
 
+    <!-- The .lst parser, tier classification and scope selection are internal; the test project
+         drives them directly rather than through a Tekla-dependent surface. -->
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+            <_Parameter1>TeklaLookup.App.Tests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
     <!-- Tekla Open API — compile-only; version selected by TeklaOpenApiVersion (Directory.Build.props):
          2021 floor in Release for forward-compat, locally-installed version in Debug. Members newer
          than the floor are invoked by reflection at runtime (see Services/OptionalTeklaApi.cs). -->
