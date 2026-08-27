@@ -33,6 +33,13 @@ public sealed class DrawingsCollector
     /// </summary>
     public IEnumerable<DrawingObject> GetSelectedDrawingObjects()
     {
+        // Tekla 2022: GetDrawingObjectSelector().GetSelected() throws a TypeInitializationException
+        // from an internal selection type ("TargetDrawing == null") when no drawing is open in the
+        // editor. LoadSelected always probes this surface, so guard on the active drawing first to
+        // keep model-only selection loads working.
+        if (_handler.GetActiveDrawing() is null)
+            yield break;
+
         var enumerator = _handler.GetDrawingObjectSelector().GetSelected();
         while (enumerator.MoveNext())
         {
