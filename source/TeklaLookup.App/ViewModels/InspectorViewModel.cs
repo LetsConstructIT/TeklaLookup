@@ -147,15 +147,7 @@ public sealed class InspectorViewModel : BaseViewModel
         try
         {
             var frame = Trail[Trail.Count - 1];
-            switch (frame.Target)
-            {
-                case Tekla.Structures.Model.ModelObject mo:
-                    try { mo.Select(); } catch { /* best effort */ }
-                    break;
-                case Tekla.Structures.Drawing.DrawingObject d:
-                    try { d.Select(); } catch { /* best effort */ }
-                    break;
-            }
+            TeklaObjectRefresher.Refresh(frame.Target);
             RenderCurrent();
             Status = $"Refreshed {frame.Title}.";
         }

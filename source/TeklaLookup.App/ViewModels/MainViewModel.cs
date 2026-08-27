@@ -998,7 +998,7 @@ public class MainViewModel : BaseViewModel
         {
             IsBusy = true;
             var frame = Trail[Trail.Count - 1];
-            RefreshTarget(frame.Target);
+            TeklaObjectRefresher.Refresh(frame.Target);
             Status = $"Refreshing {frame.Title}…";
             PumpDispatcher();
             RenderCurrent();
@@ -1011,19 +1011,6 @@ public class MainViewModel : BaseViewModel
         finally
         {
             IsBusy = false;
-        }
-    }
-
-    private static void RefreshTarget(object? target)
-    {
-        switch (target)
-        {
-            case Tekla.Structures.Model.ModelObject mo:
-                try { mo.Select(); } catch { /* best effort */ }
-                break;
-            case Tekla.Structures.Drawing.DrawingObject d:
-                try { d.Select(); } catch { /* best effort */ }
-                break;
         }
     }
 
