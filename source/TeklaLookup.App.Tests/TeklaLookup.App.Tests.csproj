@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- xUnit v3 runs as its own executable under Microsoft.Testing.Platform, which is the
+             runner global.json already selects for this repo. -->
+        <OutputType>Exe</OutputType>
+        <RootNamespace>TeklaLookup.App.Tests</RootNamespace>
+        <UseWPF>true</UseWPF>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+
+    <!--
+        Pinned to a major version on purpose. xunit.v3 carries Microsoft.Testing.Platform with it,
+        and the SDK's `dotnet test` orchestrator speaks a versioned handshake to it: a too-old MTP
+        makes the run die with "The given key '8' was not present in the dictionary" rather than
+        anything that names the real problem. Floating the major avoids that in one direction and
+        invites it in the other, so it is pinned and bumped deliberately.
+        Microsoft.NET.Test.Sdk is deliberately absent — it is the VSTest entry point, and MTP
+        replaces it.
+    -->
+    <ItemGroup>
+        <PackageReference Include="xunit.v3" Version="4.*" />
+    </ItemGroup>
+
+    <!--
+        The Tekla Open API packages come in through the app project as compile-only
+        (ExcludeAssets="runtime"), so no Tekla assembly is present at test run time. That is fine
+        and deliberate: everything under test here is the Tekla-free half of the feature — .lst
+        parsing, tier classification and scope selection. Types touching ModelObject are exercised
+        against a live Tekla, not here.
+    -->
+    <ItemGroup>
+        <ProjectReference Include="..\TeklaLookup.App\TeklaLookup.App.csproj" />
+    </ItemGroup>
+
+</Project>

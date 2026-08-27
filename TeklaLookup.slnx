@@ -11,4 +11,7 @@
         <Project Path="source/LookupEngine.UI/source/LookupEngine.UI/LookupEngine.UI.csproj" />
     </Folder>
     <Project Path="source/TeklaLookup.App/TeklaLookup.App.csproj" />
+    <Folder Name="/Tests/">
+        <Project Path="source/TeklaLookup.App.Tests/TeklaLookup.App.Tests.csproj" />
+    </Folder>
 </Solution>

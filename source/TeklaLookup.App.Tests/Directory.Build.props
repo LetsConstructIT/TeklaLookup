@@ -1,0 +1,22 @@
+<Project>
+
+    <!--
+        Local props for the test subtree, mirroring source/TeklaLookup.App/Directory.Build.props.
+        Present for the same reason: it stops MSBuild walking up to the repo-root Revit-focused
+        props. Target framework must match the app under test — TeklaLookup.App is net48 only, so
+        a modern-TFM test project could not reference it.
+    -->
+
+    <PropertyGroup>
+        <TargetFramework>net48</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>true</ImplicitUsings>
+        <PlatformTarget>x64</PlatformTarget>
+        <EnableWindowsTargeting>true</EnableWindowsTargeting>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+</Project>
