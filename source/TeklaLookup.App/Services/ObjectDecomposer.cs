@@ -6,12 +6,14 @@ using System.Reflection;
 using Tekla.Structures.Model;
 using TeklaLookup.App.Models;
 using TeklaLookup.App.Services.Extensions;
+using TSD = Tekla.Structures.Drawing;
 
 namespace TeklaLookup.App.Services;
 
 /// <summary>
 /// Produces a flat, displayable list of properties for any CLR object. For <see cref="ModelObject"/>
-/// targets it also pulls UDAs and a handful of common report properties.
+/// targets it also pulls UDAs and a handful of common report properties; drawing-side objects
+/// (drawings, views, marks, dimensions…) contribute their UDAs through the drawing API instead.
 /// </summary>
 public sealed class ObjectDecomposer
 {
@@ -50,6 +52,12 @@ public sealed class ObjectDecomposer
                 {
                     AddUserProperties(modelObject, entries);
                     AddReportProperties(modelObject, entries);
+                }
+                else if (target is TSD.DatabaseObject drawingObject)
+                {
+                    // Separate hierarchy from ModelObject, with its own UDA API and no report
+                    // properties at all — hence the dedicated branch rather than a shared one.
+                    AddDrawingUserProperties(drawingObject, entries);
                 }
                 break;
         }
@@ -234,6 +242,70 @@ public sealed class ObjectDecomposer
         value = 0;
         try { return mo.GetReportProperty(name, ref value); }
         catch { return false; }
+    }
+
+    /// <summary>
+    /// Drawing-side UDAs. <see cref="TSD.DatabaseObject"/> — the base of <c>Drawing</c>, views,
+    /// marks, dimensions and drawing parts — has no <c>GetAllUserProperties</c>; it exposes three
+    /// typed batch getters instead, which we merge back into one alphabetical block.
+    /// </summary>
+    private static void AddDrawingUserProperties(TSD.DatabaseObject target, List<PropertyEntry> entries)
+    {
+        var collected = new List<PropertyEntry>();
+        var failures = new List<string>();
+
+        CollectDrawingUserProperties<string>(collected, failures, "string",
+            () => { target.GetStringUserProperties(out var values); return values; });
+        CollectDrawingUserProperties<int>(collected, failures, "integer",
+            () => { target.GetIntegerUserProperties(out var values); return values; });
+        CollectDrawingUserProperties<double>(collected, failures, "double",
+            () => { target.GetDoubleUserProperties(out var values); return values; });
+
+        foreach (var entry in collected.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
+            entries.Add(entry);
+
+        foreach (var failure in failures)
+        {
+            entries.Add(new PropertyEntry
+            {
+                Category = "User Properties",
+                Name = "<error>",
+                Value = failure,
+            });
+        }
+    }
+
+    private static void CollectDrawingUserProperties<T>(
+        List<PropertyEntry> collected,
+        List<string> failures,
+        string label,
+        Func<Dictionary<string, T>?> read)
+    {
+        Dictionary<string, T>? values;
+        try
+        {
+            values = read();
+        }
+        catch (Exception ex)
+        {
+            // One type failing (e.g. the object isn't in a drawing yet) shouldn't hide the others.
+            failures.Add($"{label} UDAs: {ex.Message}");
+            return;
+        }
+
+        if (values is null) return;
+
+        foreach (var kvp in values)
+        {
+            collected.Add(new PropertyEntry
+            {
+                Category = "User Properties",
+                Name = kvp.Key,
+                Value = FormatValue(kvp.Value),
+                ValueType = typeof(T).Name,
+                RawValue = kvp.Value,
+            });
+        }
     }
 
     private static string? FormatValue(object? raw) => ValueFormatting.Format(raw);

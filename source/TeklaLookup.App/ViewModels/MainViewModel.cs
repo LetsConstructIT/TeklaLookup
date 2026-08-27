@@ -249,14 +249,15 @@ public class MainViewModel : BaseViewModel
 
     private void LoadSelected()
     {
-        // Cover both surfaces: a user with the drawing editor active wants their drawing-object
-        // selection; a user in the model wants their model-object selection. Concatenating is
-        // safe — only one surface is active at a time in practice.
+        // Cover every selection surface: drawing objects when the drawing editor is active, model
+        // objects when the user is in the model, and whole drawings when the selection lives in the
+        // Document Manager. Concatenating is safe — only one surface is active at a time in practice.
         Run("selection", () =>
         {
             var model = _collector.GetSelectedObjects().Select(o => o.ToSnapshot(_collector));
-            var drawing = _drawingsCollector.GetSelectedDrawingObjects().Select(d => d.ToSnapshot());
-            return model.Concat(drawing);
+            var drawingObjects = _drawingsCollector.GetSelectedDrawingObjects().Select(d => d.ToSnapshot());
+            var drawings = _drawingsCollector.GetSelectedDrawings().Select(d => d.ToSnapshot());
+            return model.Concat(drawingObjects).Concat(drawings);
         });
     }
 

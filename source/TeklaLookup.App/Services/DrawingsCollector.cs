@@ -28,6 +28,27 @@ public sealed class DrawingsCollector
     public Drawing? GetActiveDrawing() => _handler.GetActiveDrawing();
 
     /// <summary>
+    /// Returns the drawings currently selected in the Document Manager. The Open API still calls
+    /// this surface "the drawing list dialog" — the pre-2019 name for the same panel. Only drawing
+    /// rows come back; other document rows (attached files, NC files, reports) aren't Drawing
+    /// objects and are silently ignored by the selector.
+    /// </summary>
+    public IEnumerable<Drawing> GetSelectedDrawings()
+    {
+        // LoadSelected enumerates this lazily alongside the other selection surfaces, so a throw
+        // here would drop the whole load. Bail out instead when the drawing side isn't reachable.
+        if (!_handler.GetConnectionStatus())
+            yield break;
+
+        var enumerator = _handler.GetDrawingSelector().GetSelected();
+        while (enumerator.MoveNext())
+        {
+            if (enumerator.Current is Drawing d)
+                yield return d;
+        }
+    }
+
+    /// <summary>
     /// Returns the drawing objects the user currently has selected in the active drawing editor.
     /// Empty when no drawing is open or no objects are selected.
     /// </summary>
