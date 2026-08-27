@@ -154,7 +154,7 @@ public sealed class TemplateAttributeCatalog
             if (!_visited.Add(full)) return false;
 
             var inBindings = false;
-            foreach (var rawLine in File.ReadAllLines(path, Encoding.UTF8))
+            foreach (var rawLine in ReadAllLinesDetectingEncoding(path))
             {
                 var line = StripComment(rawLine).Trim();
                 if (line.Length == 0) continue;
@@ -261,6 +261,57 @@ public sealed class TemplateAttributeCatalog
             try { return Path.GetFullPath(path); }
             catch (Exception) { return path; }
         }
+
+        /// <summary>
+        /// Reads a .lst file with its encoding detected rather than assumed. Stock files are a
+        /// mix — ASCII, UTF-8 with BOM, and legacy ANSI (Finland's and the USA environment's
+        /// userdefined/external files ship that way, and firm files generated from
+        /// <c>objects.inp</c> usually do too). Decoding ANSI bytes as UTF-8 silently replaces
+        /// them with U+FFFD, corrupting quoted labels and any attribute name that carries one.
+        /// </summary>
+        private static string[] ReadAllLinesDetectingEncoding(string path)
+        {
+            var bytes = File.ReadAllBytes(path);
+
+            Encoding encoding;
+            var offset = 0;
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+            {
+                encoding = Encoding.UTF8;
+                offset = 3;
+            }
+            else if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+            {
+                encoding = Encoding.Unicode;
+                offset = 2;
+            }
+            else if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
+            {
+                encoding = Encoding.BigEndianUnicode;
+                offset = 2;
+            }
+            else
+            {
+                // No BOM: strict UTF-8 if the bytes actually are UTF-8 (which covers plain
+                // ASCII), otherwise the system ANSI code page — the encoding the Template Editor
+                // itself writes on that machine.
+                encoding = new UTF8Encoding(
+                    encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+                try
+                {
+                    return SplitLines(encoding.GetString(bytes));
+                }
+                catch (DecoderFallbackException)
+                {
+                    encoding = Encoding.Default;
+                }
+            }
+
+            return SplitLines(encoding.GetString(bytes, offset, bytes.Length - offset));
+        }
+
+        private static string[] SplitLines(string text)
+            => text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
 
         public Dictionary<string, IReadOnlyList<TemplateAttributeDefinition>> Build()
         {

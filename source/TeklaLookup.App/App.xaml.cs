@@ -12,6 +12,10 @@ public partial class App : Application
     {
         SettingsStore.Load();
         PinnedAttributeStore.Load();
+        // Start template-attribute discovery now, off-thread: it probes every XS_* search path
+        // with Directory.Exists, and an unreachable network share in XS_FIRM would otherwise
+        // freeze the UI on the first decomposition instead of resolving during startup.
+        Services.TemplateAttributes.TemplateAttributeCatalogProvider.Prime();
         Exit += OnExit;
     }
 

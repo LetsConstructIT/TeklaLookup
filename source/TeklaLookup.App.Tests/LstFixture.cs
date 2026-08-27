@@ -35,6 +35,16 @@ public sealed class LstFixture : IDisposable
         return full;
     }
 
+    /// <summary>Writes raw bytes, for tests that pin down encoding handling.</summary>
+    public string WriteBytes(string relativePath, byte[] contents)
+    {
+        var full = Path.Combine(_root, relativePath);
+        var directory = Path.GetDirectoryName(full);
+        if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory!);
+        File.WriteAllBytes(full, contents);
+        return full;
+    }
+
     public string Dir(string relativePath = "")
     {
         var full = relativePath.Length == 0 ? _root : Path.Combine(_root, relativePath);

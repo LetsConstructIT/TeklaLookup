@@ -11,11 +11,15 @@ namespace TeklaLookup.App.Services.TemplateAttributes;
 /// <see cref="TemplateAttributeCatalog"/>.
 /// </summary>
 /// <remarks>
-/// Search order mirrors Tekla's own: model folder, then <c>XS_PROJECT</c>, <c>XS_FIRM</c> and
-/// <c>XS_SYSTEM</c>. Each of those roots is checked directly and under <c>template\settings\</c>,
-/// which is where stock environments actually keep the files. First file of a given NAME wins, per
-/// filename rather than per folder — a project that overrides only
-/// <c>contentattributes_userdefined.lst</c> still inherits the system <c>_global</c> one.
+/// Search order mirrors Tekla's own: model folder, then <c>XS_PROJECT</c>, <c>XS_FIRM</c>,
+/// <c>XS_SYSTEM</c> and finally <c>XS_TPLED_INI</c> — the option every stock environment uses to
+/// name its Template Editor settings folder outright. Each root is checked directly and under
+/// both <c>template\settings\</c> and <c>settings\</c>: most environments use the former, but the
+/// USA environment reaches its files as <c>...\General\Templates\</c> + <c>settings\</c>, and
+/// <c>blank_project</c>'s XS_SYSTEM likewise stops one <c>settings\</c> short of the files.
+/// First file of a given NAME wins, per filename rather than per folder — a project that
+/// overrides only <c>contentattributes_userdefined.lst</c> still inherits the system
+/// <c>_global</c> one.
 /// <para>
 /// The cache is keyed on the open model's path, so opening a model in a different environment
 /// picks up that environment's attributes without anyone having to invalidate anything.
@@ -23,7 +27,12 @@ namespace TeklaLookup.App.Services.TemplateAttributes;
 /// </remarks>
 public static class TemplateAttributeCatalogProvider
 {
-    private static readonly string[] SearchOptions = { "XS_PROJECT", "XS_FIRM", "XS_SYSTEM" };
+    /// <summary>
+    /// <c>XS_TPLED_INI</c> last: it points at the environment's Template Editor settings folder
+    /// directly and is the authoritative source, but project/firm/system overrides still win on a
+    /// per-filename basis, so it belongs after them like the installation defaults belong after it.
+    /// </summary>
+    private static readonly string[] SearchOptions = { "XS_PROJECT", "XS_FIRM", "XS_SYSTEM", "XS_TPLED_INI" };
 
     /// <summary>
     /// Where the Template Editor settings folder sits relative to an installation root. Two forms
@@ -67,6 +76,30 @@ public static class TemplateAttributeCatalogProvider
                 return _catalog;
             }
         }
+    }
+
+    /// <summary>
+    /// Warms the catalog on a background thread so the first decomposition doesn't pay the
+    /// discovery cost on the UI thread. That cost is dominated by <c>Directory.Exists</c> over
+    /// paths from <c>XS_FIRM</c>/<c>XS_PROJECT</c>, which routinely point at network shares — an
+    /// unreachable share blocks for seconds per candidate and returns false rather than throwing,
+    /// so no exception handler shortens the wait. Safe to call at any time: with no model
+    /// connected it simply does nothing, and a UI-thread caller arriving mid-prime waits on
+    /// <see cref="Gate"/> no longer than it would have spent loading the catalog itself.
+    /// </summary>
+    public static void Prime()
+    {
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                _ = Current;
+            }
+            catch (Exception)
+            {
+                // Best-effort warm-up; the real load path has its own error handling.
+            }
+        });
     }
 
     private static TemplateAttributeCatalog LoadSafely(string modelPath)
@@ -128,10 +161,15 @@ public static class TemplateAttributeCatalogProvider
     {
         foreach (var root in SearchRoots(modelPath))
         {
+            string? templateSettings;
             string? settings;
             try
             {
-                settings = Path.Combine(root, "template", "settings");
+                templateSettings = Path.Combine(root, "template", "settings");
+                // The USA environment keeps its files under "...\Templates\settings" and reaches
+                // them via a search-path entry ending at "Templates\" — so the bare "settings\"
+                // child matters too, not just "template\settings\".
+                settings = Path.Combine(root, "settings");
             }
             catch (ArgumentException)
             {
@@ -139,6 +177,7 @@ public static class TemplateAttributeCatalogProvider
             }
 
             yield return root;
+            yield return templateSettings;
             yield return settings;
         }
     }
@@ -166,9 +205,11 @@ public static class TemplateAttributeCatalogProvider
     /// (<c>bin\applications\Tekla\Tools\TplEd\settings</c>), which holds the default attribute set.
     /// </summary>
     /// <remarks>
-    /// Located from <c>XS_DIR</c> where it is set, and otherwise from the folder the Tekla API
-    /// assembly was actually loaded from — that is inside the running installation by definition,
-    /// which makes it a reliable fallback when the advanced option is unavailable.
+    /// Located from the <c>XS_DIR</c> advanced option where it answers, then from the <c>XS_DIR</c>
+    /// environment variable — the app is started by Tekla and inherits its environment block, so
+    /// the variable is present even when the option API is not responding — and last from the
+    /// folder the Tekla API assembly was loaded from, which only helps when that is the
+    /// installation's <c>bin</c> rather than the GAC.
     /// </remarks>
     private static IEnumerable<string> TemplateEditorSettingsDirectories()
     {
@@ -197,16 +238,26 @@ public static class TemplateAttributeCatalogProvider
         if (!string.IsNullOrWhiteSpace(installDirectory))
             yield return installDirectory!;
 
+        var inheritedInstallDirectory = TryGetEnvironmentVariable("XS_DIR");
+        if (inheritedInstallDirectory is not null)
+            yield return inheritedInstallDirectory;
+
         string? assemblyDirectory = null;
         try
         {
+            // The Open API packages are compile-only, so at runtime this assembly usually resolves
+            // from the GAC — a path under Windows that a walk-up can never turn into an
+            // installation root. Only a genuine <install>\bin location is worth walking from.
             var location = typeof(Model).Assembly.Location;
-            if (!string.IsNullOrEmpty(location))
+            if (!string.IsNullOrEmpty(location) &&
+                location.IndexOf("GAC", StringComparison.OrdinalIgnoreCase) < 0)
+            {
                 assemblyDirectory = Path.GetDirectoryName(location);
+            }
         }
         catch (Exception)
         {
-            // Loaded from the GAC or otherwise without a file path — nothing to derive.
+            // Loaded without a file path at all — nothing to derive.
         }
 
         // Walk up from the assembly: it sits under <install>\bin, so <install> is a level or two up.
@@ -214,6 +265,19 @@ public static class TemplateAttributeCatalogProvider
         {
             yield return assemblyDirectory;
             assemblyDirectory = Path.GetDirectoryName(assemblyDirectory);
+        }
+    }
+
+    private static string? TryGetEnvironmentVariable(string name)
+    {
+        try
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 

@@ -195,8 +195,8 @@ public sealed class TemplateAttributeReader
 
         var sample = string.Join("; ", catalog.SearchedDirectories.Take(3));
         return $"No contentattributes*.lst found in {catalog.SearchedDirectories.Count} folder(s) "
-             + $"under the model, XS_PROJECT, XS_FIRM, XS_SYSTEM or the Template Editor settings. "
-             + $"Searched e.g. {sample}";
+             + $"under the model, XS_PROJECT, XS_FIRM, XS_SYSTEM, XS_TPLED_INI or the Template "
+             + $"Editor settings. Searched e.g. {sample}";
     }
 
     private static string CategoryFor(TemplateAttributeDefinition definition)
