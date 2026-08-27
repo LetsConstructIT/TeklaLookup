@@ -93,6 +93,8 @@
                 </ItemsControl>
             </Grid>
 
+            <!-- Grouping switches row virtualization off unless IsVirtualizingWhenGrouping is set,
+                 so every regroup (a pin toggle, a new target) would realize every row. -->
             <DataGrid Name="PropertiesGrid"
                       ItemsSource="{Binding PropertiesView}"
                       AutoGenerateColumns="False"
@@ -100,6 +102,9 @@
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      VirtualizingPanel.ScrollUnit="Pixel"
                       CellStyle="{StaticResource HighlightedCellStyle}"
                       MouseDoubleClick="OnPropertiesGridDoubleClick">
                 <DataGrid.InputBindings>

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -73,18 +73,39 @@ public sealed class ObjectDecomposer
         var scope = TeklaContentTypes.ScopeFor(target);
         if (scope.Length == 0) return entries;
 
+        foreach (var entry in entries)
+            entry.PinScope = scope;
+
+        return SyncPins(entries);
+    }
+
+    /// <summary>
+    /// Re-reads the pin state of rows that are already on screen and returns them in the same
+    /// pinned-first order a fresh decomposition would produce.
+    /// </summary>
+    /// <remarks>
+    /// A pin changes nothing that was read from Tekla, so toggling one must not cost a second
+    /// pass over every UDA and template attribute of the target. This is that cheap path: it only
+    /// touches the rows that are already in hand, and keeps group ordering owned by this class
+    /// rather than by view-level live shaping.
+    /// </remarks>
+    public static IReadOnlyList<PropertyEntry> SyncPins(IReadOnlyList<PropertyEntry> entries)
+    {
         var anyPinned = false;
         foreach (var entry in entries)
         {
-            entry.PinScope = scope;
-            if (!entry.CanPin || !PinnedAttributeStore.IsPinned(scope, entry.Name)) continue;
-            entry.IsPinned = true;
-            anyPinned = true;
+            var pinned = entry.CanPin && PinnedAttributeStore.IsPinned(entry.PinScope, entry.Name);
+            entry.IsPinned = pinned;
+            anyPinned |= pinned;
         }
 
-        if (!anyPinned) return entries;
-
         var ordered = new List<PropertyEntry>(entries.Count);
+        if (!anyPinned)
+        {
+            ordered.AddRange(entries);
+            return ordered;
+        }
+
         foreach (var entry in entries) if (entry.IsPinned) ordered.Add(entry);
         foreach (var entry in entries) if (!entry.IsPinned) ordered.Add(entry);
         return ordered;

@@ -121,7 +121,7 @@ public sealed class InspectorViewModel : BaseViewModel
     }
 
     public ObservableCollection<DecompositionFrame> Trail { get; } = new();
-    public ObservableCollection<PropertyEntry> Properties { get; } = new();
+    public BulkObservableCollection<PropertyEntry> Properties { get; } = new();
     public ICollectionView PropertiesView { get; }
 
     public ICommand NavigateBackCommand { get; }
@@ -138,16 +138,20 @@ public sealed class InspectorViewModel : BaseViewModel
     public ICommand TogglePinCommand { get; }
 
     /// <summary>
-    /// Stars or unstars an attribute for its content type, then re-renders so the row moves into
-    /// or out of the "Pinned" group. Re-decomposing is a batched read, and doing it this way keeps
-    /// group ordering owned by <see cref="ObjectDecomposer"/> rather than by view-level live shaping.
+    /// Stars or unstars an attribute for its content type, then moves the row into or out of the
+    /// "Pinned" group.
     /// </summary>
+    /// <remarks>
+    /// Re-shapes the rows already on screen rather than re-decomposing the frame: a pin changes
+    /// nothing that was read from Tekla, so re-reading every UDA and template attribute of the
+    /// target would be pure waste. See <see cref="ObjectDecomposer.SyncPins"/>.
+    /// </remarks>
     private void TogglePin(PropertyEntry? entry)
     {
         if (entry is null || !entry.CanPin) return;
 
         var pinned = PinnedAttributeStore.Toggle(entry.PinScope, entry.Name);
-        RenderCurrent();
+        Properties.ReplaceAll(ObjectDecomposer.SyncPins(Properties));
         Status = pinned
             ? $"Pinned {entry.Name} for {entry.PinScope}."
             : $"Unpinned {entry.Name} for {entry.PinScope}.";
@@ -245,24 +249,28 @@ public sealed class InspectorViewModel : BaseViewModel
 
     private void RenderCurrent()
     {
-        Properties.Clear();
         if (Trail.Count == 0)
         {
             CurrentTargetTitle = null;
+            Properties.ReplaceAll(Array.Empty<PropertyEntry>());
         }
         else
         {
             var frame = Trail[Trail.Count - 1];
             CurrentTargetTitle = frame.Title;
+            // One handover rather than one per row: the grid is grouped, so every single change
+            // notification costs a group rebuild.
+            var rows = new List<PropertyEntry>();
             try
             {
-                foreach (var entry in _decomposer.Decompose(frame.Target, _options))
-                    Properties.Add(entry);
+                rows.AddRange(_decomposer.Decompose(frame.Target, _options));
             }
             catch (Exception ex)
             {
                 Status = $"Failed to decompose object: {ex.Message}";
             }
+
+            Properties.ReplaceAll(rows);
         }
         OnPropertyChanged(nameof(CanGoBack));
     }

@@ -186,7 +186,7 @@ public class MainViewModel : BaseViewModel
     }
 
     public ObservableCollection<TeklaObjectSnapshot> Objects { get; } = new();
-    public ObservableCollection<PropertyEntry> Properties { get; } = new();
+    public BulkObservableCollection<PropertyEntry> Properties { get; } = new();
     public ICollectionView PropertiesView { get; }
     public ICollectionView ObjectsView { get; }
 
@@ -275,16 +275,22 @@ public class MainViewModel : BaseViewModel
     }
 
     /// <summary>
-    /// Stars or unstars an attribute for its content type, then re-renders so the row moves into
-    /// or out of the "Pinned" group. Re-decomposing is a batched read, and doing it this way keeps
-    /// group ordering owned by <see cref="ObjectDecomposer"/> rather than by view-level live shaping.
+    /// Stars or unstars an attribute for its content type, then moves the row into or out of the
+    /// "Pinned" group.
     /// </summary>
+    /// <remarks>
+    /// The rows already on screen carry everything a pin affects, so this re-shapes them in place
+    /// instead of re-decomposing the frame — which would re-read every UDA and template attribute
+    /// from Tekla just to move one row. A row unpinned while the template attribute scope would no
+    /// longer read it stays visible until the next real render, which is what lets you undo a
+    /// misclick.
+    /// </remarks>
     private void TogglePin(PropertyEntry? entry)
     {
         if (entry is null || !entry.CanPin) return;
 
         var pinned = PinnedAttributeStore.Toggle(entry.PinScope, entry.Name);
-        RenderCurrent();
+        Properties.ReplaceAll(ObjectDecomposer.SyncPins(Properties));
         Status = pinned
             ? $"Pinned {entry.Name} for {entry.PinScope}."
             : $"Unpinned {entry.Name} for {entry.PinScope}.";
@@ -1127,16 +1133,18 @@ public class MainViewModel : BaseViewModel
 
     private void RenderCurrent()
     {
-        Properties.Clear();
-
         if (Trail.Count == 0)
         {
             CurrentTargetTitle = null;
+            Properties.ReplaceAll(Array.Empty<PropertyEntry>());
         }
         else
         {
             var frame = Trail[Trail.Count - 1];
             CurrentTargetTitle = frame.Title;
+            // Collected off to the side and handed over in one go: the properties grid is grouped,
+            // so adding row by row makes WPF rebuild its groups once per row.
+            var rows = new List<PropertyEntry>();
             try
             {
                 // Decomposing a frame can be expensive when the target is a long list of catalog
@@ -1146,7 +1154,7 @@ public class MainViewModel : BaseViewModel
                 var rendered = 0;
                 foreach (var entry in _decomposer.Decompose(frame.Target, _options))
                 {
-                    Properties.Add(entry);
+                    rows.Add(entry);
                     rendered++;
                     if (rendered % progressTick == 0)
                     {
@@ -1164,6 +1172,8 @@ public class MainViewModel : BaseViewModel
             {
                 Status = $"Failed to decompose object: {ex.Message}";
             }
+
+            Properties.ReplaceAll(rows);
         }
 
         OnPropertyChanged(nameof(CanGoBack));
