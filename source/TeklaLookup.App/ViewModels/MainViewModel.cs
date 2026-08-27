@@ -989,7 +989,8 @@ public class MainViewModel : BaseViewModel
     /// Re-runs decomposition on the current frame, picking up any changes the user made in Tekla
     /// since the frame was opened (UDA edits, attribute changes, geometry edits). For model and
     /// drawing objects we also call <c>Select()</c> first to pull fresh database state, since
-    /// Tekla's wrapper objects cache their property values until refreshed.
+    /// Tekla's wrapper objects cache their property values until refreshed, then re-derive the
+    /// grid row so the list and the details pane can't disagree.
     /// </summary>
     private void Refresh()
     {
@@ -999,6 +1000,7 @@ public class MainViewModel : BaseViewModel
             IsBusy = true;
             var frame = Trail[Trail.Count - 1];
             TeklaObjectRefresher.Refresh(frame.Target);
+            RebuildRowFor(frame.Target);
             Status = $"Refreshing {frame.Title}…";
             PumpDispatcher();
             RenderCurrent();
@@ -1011,6 +1013,34 @@ public class MainViewModel : BaseViewModel
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Row type/summary text is derived once at load time, so a refreshed object would keep showing
+    /// its old description in the grid. Re-derive whichever row owns the refreshed instance — the
+    /// row and the trail frame share the same live wrapper, so reference identity is the match.
+    /// </summary>
+    private void RebuildRowFor(object? target)
+    {
+        if (target is null) return;
+
+        foreach (var snapshot in Objects)
+        {
+            if (!ReferenceEquals(snapshot.Source, target)) continue;
+            switch (target)
+            {
+                case Tekla.Structures.Model.ModelObject modelObject:
+                    snapshot.RefreshFrom(modelObject);
+                    break;
+                case Tekla.Structures.Drawing.Drawing drawing:
+                    snapshot.RefreshFrom(drawing);
+                    break;
+                case Tekla.Structures.Drawing.DrawingObject drawingObject:
+                    snapshot.RefreshFrom(drawingObject);
+                    break;
+            }
+            break;
         }
     }
 

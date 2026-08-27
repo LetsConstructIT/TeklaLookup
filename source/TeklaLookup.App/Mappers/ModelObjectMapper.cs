@@ -11,14 +11,24 @@ internal static class ModelObjectMapper
 {
     public static TeklaObjectSnapshot ToSnapshot(this ModelObject modelObject, TeklaObjectsCollector collector)
     {
-        return new TeklaObjectSnapshot
+        var snapshot = new TeklaObjectSnapshot
         {
-            TypeName = BuildTypeName(modelObject),
             Guid = collector.GetGuid(modelObject),
             IdentifierId = modelObject.Identifier.ID,
-            Summary = BuildSummary(modelObject),
             Source = modelObject,
         };
+        snapshot.RefreshFrom(modelObject);
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Re-derives the display columns from the live object. Call after a <c>Select()</c> so a
+    /// rename or profile change made in Tekla reaches the grid row, not just the details pane.
+    /// </summary>
+    public static void RefreshFrom(this TeklaObjectSnapshot snapshot, ModelObject modelObject)
+    {
+        snapshot.TypeName = BuildTypeName(modelObject);
+        snapshot.Summary = BuildSummary(modelObject);
     }
 
     /// <summary>

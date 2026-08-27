@@ -7,14 +7,21 @@ internal static class DrawingMapper
 {
     public static TeklaObjectSnapshot ToSnapshot(this DrawingObject drawingObject)
     {
-        return new TeklaObjectSnapshot
+        var snapshot = new TeklaObjectSnapshot
         {
-            TypeName     = drawingObject.GetType().Name,
             Guid         = string.Empty,
             IdentifierId = 0,
-            Summary      = BuildDrawingObjectSummary(drawingObject),
             Source       = drawingObject,
         };
+        snapshot.RefreshFrom(drawingObject);
+        return snapshot;
+    }
+
+    /// <summary>Re-derives the display columns from the live drawing object.</summary>
+    public static void RefreshFrom(this TeklaObjectSnapshot snapshot, DrawingObject drawingObject)
+    {
+        snapshot.TypeName = drawingObject.GetType().Name;
+        snapshot.Summary  = BuildDrawingObjectSummary(drawingObject);
     }
 
     private static string? BuildDrawingObjectSummary(DrawingObject drawingObject)
@@ -35,14 +42,24 @@ internal static class DrawingMapper
 
     public static TeklaObjectSnapshot ToSnapshot(this Drawing drawing)
     {
-        return new TeklaObjectSnapshot
+        var snapshot = new TeklaObjectSnapshot
         {
-            TypeName     = drawing.GetType().Name,
             Guid         = string.Empty,
             IdentifierId = 0, // Drawing.Identifier isn't part of the public API surface
-            Summary      = BuildSummary(drawing),
             Source       = drawing,
         };
+        snapshot.RefreshFrom(drawing);
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Re-derives the display columns from the live drawing. Call after a <c>Select()</c> so a
+    /// rename or retitle made in Tekla reaches the grid row, not just the details pane.
+    /// </summary>
+    public static void RefreshFrom(this TeklaObjectSnapshot snapshot, Drawing drawing)
+    {
+        snapshot.TypeName = drawing.GetType().Name;
+        snapshot.Summary  = BuildSummary(drawing);
     }
 
     private static string BuildSummary(Drawing drawing)
