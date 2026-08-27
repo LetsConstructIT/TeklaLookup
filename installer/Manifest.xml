@@ -10,7 +10,7 @@
          connects to the open model/drawing over the Tekla Open API). -->
     <Product Id="TeklaLookup"
              UpgradeCode="d2ab94ad-6426-4ce2-b60b-2fe3d3ce326c"
-             Version="1.1"
+             Version="1.2"
              Language="1033"
              Name="Tekla Lookup"
              Manufacturer="Greg Olszewski"
